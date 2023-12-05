@@ -9,9 +9,7 @@ _使用 C++ 实现一个**分布式流媒体**项目_
 **[⚾]** **简单了解单机服务器开发的概念**
 在同一台服务器上保存所有项目文件, 不同类型的文件存放在不同子目录下, 如下所示 : 
 
-<img src="./res/markdownRes/ApplicationServer.png" height="256.5" width="128">
-<img src="./res/markdownRes/IndependentServer.png" height="256.5" width="198.9">
-<img src="./res/markdownRes/DistributedStorage.png" height="256.5" width="198.9">
+<img src="./res/markdownRes/ApplicationServer.png" height="256.5" width="128"> <img src="./res/markdownRes/IndependentServer.png" height="256.5" width="198.9"> <img src="./res/markdownRes/DistributedStorage.png" height="256.5" width="198.9">
 
 ```
 FS:\app
