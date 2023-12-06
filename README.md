@@ -127,9 +127,20 @@ FS:\app
 
 ### 存储服务器报文
 1. **客户机向存储服务器上传文件**
+
+   <img src="./res/markdownRes/StorageServer_ClientUploadFiles2StorageServer.png" style="float:left;" height="332">
+
 2. **客户机向存储服务器询问文件大小**
+
+   <img src="./res/markdownRes/StorageServer_ClientAskSizeOfFile2StorageServer.png" style="float:left;" height="332">
+
 3. **客户机从存储服务器下载文件**
+
+   <img src="./res/markdownRes/StorageServer_ClientDownloadFilesFromStorageServer.png" style="float:left;" height="332">
+
 4. **客户机要求删除存储服务器上的文件**
+
+   <img src="./res/markdownRes/StorageServer_ClientDeleteFilesONStorageServer.png" style="float:left;" height="332">
 
 
 
