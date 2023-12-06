@@ -105,25 +105,25 @@ FS:\app
 ### 跟踪服务器报文
 1. **存储服务器向跟踪服务器请求加入** 
 
-   <img src="./res/markdownRes/TrackerServer_StorageServer2TrackerServer_RequestToJoin.png" style="float:left; zoom:40%"/>
+   <img src="./res/markdownRes/TrackerServer_StorageServer2TrackerServer_RequestToJoin.png" height="332" width="" style="float:left;"/>
 
    
 
 2. **存储服务器向跟踪服务器发送心跳**
 
-   <img src="./res/markdownRes/TrackerServer_StorageServer2TrackerServer_SendHeartBeat.png" style="float:left; zoom:40%"/>
+   <img src="./res/markdownRes/TrackerServer_StorageServer2TrackerServer_SendHeartBeat.png" height="332" style="float:left;"/>
 
 3. **客户机从跟踪服务器获取存储服务器地址表**
 
-   <img src="./res/markdownRes/TrackerServer_ClientGetStorageServerList_FromTS.png" style="float:left; zoom:40%"/>
+   <img src="./res/markdownRes/TrackerServer_ClientGetStorageServerList_FromTS.png" height="332" style="float:left;"/>
 
 4. **客户机从跟踪服务器获取组列表**
 
-   <img src="./res/markdownRes/TrackerServer_ClientGetGroupList_FromTS.png" style="float:left; zoom:40%"/>
+   <img src="./res/markdownRes/TrackerServer_ClientGetGroupList_FromTS.png" height="332" style="float:left;"/>
 ### ID 服务器报文
 0. **存储服务器从ID服务器获取ID**
 
-   <img src="./res/markdownRes/IDServer_StorageServerGetID_FromIDS.png" style="zoom:40%; float:left"/>
+   <img src="./res/markdownRes/IDServer_StorageServerGetID_FromIDS.png" height="332" style="float:left"/>
 
 ### 存储服务器报文
 1. **客户机向存储服务器上传文件**
