@@ -142,7 +142,10 @@ FS:\app
 
    <img src="./res/markdownRes/StorageServer_ClientDeleteFilesONStorageServer.png" style="float:left;" height="332">
 
+## [🖊] 库表结构
 
+<img src="./res/markdownRes/库表结构.png" style="float: left" height="322">
 
+### tnv_trackerdb 跟踪服务器数据库
 
-
+| id | group_name | create_time | update_time |
