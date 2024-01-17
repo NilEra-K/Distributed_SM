@@ -281,7 +281,236 @@ ID 服务器采用键(`id`)-值(`id_value`)对的形式管理保存在每个存�
    sudo ufw allow ssh
    ```
 
-   
 
+### 存储系统
 
+#### Tcl
 
+- **Tcl**是一种类似 *Shell* 或 *Python* 的，带有编程特征的解释型脚本语言
+
+- 本项目并不直接使用**Tcl**，但本项目利用**Redis**实现缓存，**Redis**需要**Tcl**
+
+- 在项目目录下构建并安装**Tcl**
+
+  ```bash
+  nilera@nilera-virtual-machine:~$ cd SoftwarePackages
+  nilera@nilera-virtual-machine:~/SoftwarePackages$ wget http://downloads.sourceforge.net/tcl/tcl8.6.1-src.tar.gz
+  ```
+
+  ```bash
+  nilera@nilera-virtual-machine:~/SoftwarePackages$ tar xzvf tcl8.6.1-src.tar.gz -C ../Software/Tcl
+  ```
+
+  ```bash
+  nilera@nilera-virtual-machine:~/Software/Tcl/tcl8.6.1/unix$ ./configure
+  ```
+
+  ```bash
+  nilera@nilera-virtual-machine:~/Software/Tcl/tcl8.6.1/unix$ make
+  nilera@nilera-virtual-machine:~/Software/Tcl/tcl8.6.1/unix$ sudo make install
+  ```
+
+#### Redis
+
+- **Redis**是一种基于*键-值对结构*的，高性能内存数据库（也可以持久化到磁盘）
+
+- 本项目利用**Redis**作为数据库缓存，以提高对数据访问（主要是读访问）的效率
+
+- 在项目目录下构建并安装**Redis**
+
+  **参考博客：**[Ubuntu 22.04 编译安装 Redis 7](https://blog.csdn.net/u010044182/article/details/131481655)
+  
+  **Redis官网：**[Redis](https://redis.io/)
+  
+  ```bash
+  nilera@nilera-virtual-machine:~$ cd SoftwarePackages
+  nilera@nilera-virtual-machine:~/SoftwarePackages$ wget https://github.com/redis/redis/archive/7.2.4.tar.gz
+  ```
+
+  ```bash
+  nilera@nilera-virtual-machine:~/SoftwarePackages$ tar xzvf redis-7.2.4.tar.gz -C ../Software/Redis
+  ```
+  
+  ```bash
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo apt install make gcc pkg-config
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ make -j4	# -j 使用多线程编译
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ make test
+  
+  # 最好的情况: All tests passed without errors!
+  # 有些错误的话也是不影响的
+  # 满屏错误就比较离谱了
+  
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo make install
+  ```
+
+完成以上步骤后，Redis其实已经完成了安装，但是此时每次重启机器时，都需要手动启动Redis，因此需要将其制作为服务，方便我们的操作。上述过程如下：
+
+- 修改内核参数
+
+  ```bash
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo vi /etc/sysctl.conf
+  
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo vi /etc/sysctl.conf
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo sysctl -p
+  [sudo] password for nilera:
+  vm.overcommit_memory = 1
+  net.core.somaxconn = 511
+  ```
+
+  添加或修改配置：`vm.overcommit_memory=1`以及`net.core.somaxconn=511`，然后保存文件。
+
+  使配置文件生效：`sudo sysctl -p`
+
+- 复制并修改Redis配置文件
+
+  ```bash
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo mkdir -p /etc/redis
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo mkdir -p /var/redis/6379
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo cp redis.conf /etc/redis/6379.conf
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo vi /etc/redis/6379.conf
+  ```
+
+  `6379`是Redis默认端口号，Redis可以在一台机器上产生多个实例，这些实例通过端口号进行区分。
+
+  修改`daemonize yes`表示**开启精灵模式**，以及`dir /var/redis/6379`表示**指定持久化路径**。
+
+- 将Redis配置为系统服务并启动
+
+  ```bash
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo cp utils/redis_init_script /etc/init.d/redis_6379
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo vi /etc/init.d/redis_6379
+  ### BEGIN INIT INFO
+  # Provides:				redis_6379
+  # Required-Start:		
+  # Required-Stop:		
+  # Default-Start:		2 3 4 5
+  # Default-Stop:			0 1 6
+  # Short-Description:	Redis data structure server
+  # Description:			Redis data structure server. See https://redis.io
+  ### END INIT INFO
+  
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo update-rc.d redis_6379 defaults
+  
+  # 开启服务
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo /etc/init.d/redis_6379 start
+  
+  # 关闭服务
+  nilera@nilera-virtual-machine:~/Software/Redis/redis-7.2.4$ sudo /etc/init.d/redis_6379 stop
+  ```
+
+  `init.d`是Linux用于启动后台服务的脚本的位置。
+
+#### MySQL
+
+- **MySQL**是一个关系型数据库管理系统，由瑞典**MySQLAB** 公司开发，属于**Oracle**旗下产品
+
+- MySQL实行双授权政策，分为社区版和商业版，由于其体积小、速度快、拥有成本低且开放源代码，一般中小型应用系统多选择MySQL作为数据库
+
+- 在系统中安装MySQL服务器、客户端及客户端开发库
+
+  **参考博客：**[Ubuntu 22.04 安装 MySQL5.7.42 - CSDN博客](https://blog.csdn.net/gd911202/article/details/128662691)
+
+  **MySQL：**[Download MySQL Community Server (Archived Versions)](https://downloads.mysql.com/archives/community/)
+
+  ```bash
+  # 更新依赖源及安装libaio1以及libtinfo5的依赖
+  nilera@nilera-virtual-machine:~/SoftwarePackages$ tar -xvf ./mysql-server_5.7.42-1ubuntu18.04_amd64.deb-bundle.tar -C ../Software/MySQL
+  ```
+
+  ```bash
+  # 按下列顺序安装（提示缺少依赖可更换顺序）
+  nilera@nilera-virtual-machine:~/Software/MySQL$ sudo dpkg -i mysql-common_5.7.42-1ubuntu18.04_amd64.deb
+  nilera@nilera-virtual-machine:~/Software/MySQL$ sudo dpkg-preconfigure mysql-community-server_5.7.42-1ubuntu18.04_amd64.deb # 此步需要输入数据库的root用户的密码
+  nilera@nilera-virtual-machine:~/Software/MySQL$ sudo dpkg -i libmysqlclient20_5.7.42-1ubuntu18.04_amd64.deb
+  nilera@nilera-virtual-machine:~/Software/MySQL$ sudo dpkg -i libmysqlclient-dev_5.7.42-1ubuntu18.04_amd64.deb
+  nilera@nilera-virtual-machine:~/Software/MySQL$ sudo dpkg -i libmysqld-dev_5.7.42-1ubuntu18.04_amd64.deb
+  nilera@nilera-virtual-machine:~/Software/MySQL$ sudo dpkg -i mysql-community-client_5.7.42-1ubuntu18.04_amd64.deb
+  nilera@nilera-virtual-machine:~/Software/MySQL$ sudo dpkg -i mysql-client_5.7.42-1ubuntu18.04_amd64.deb
+  nilera@nilera-virtual-machine:~/Software/MySQL$ sudo dpkg -i mysql-common_5.7.42-1ubuntu18.04_amd64.deb
+  ```
+
+  ```bash
+  # 继续安装依赖
+  nilera@nilera-virtual-machine:~/Software/MySQL$ sudo apt-get -f install
+  nilera@nilera-virtual-machine:~/Software/MySQL$ sudo apt-get -f install libmecab2
+  ```
+
+  ```bash
+  # 安装 mysql-server
+  nilera@nilera-virtual-machine:~/Software/MySQL$ sudo dpkg -i mysql-community-server_5.7.42-1ubuntu18.04_amd64.deb
+  nilera@nilera-virtual-machine:~/Software/MySQL$ sudo dpkg -i mysql-server_5.7.42-1ubuntu18.04_amd64.deb
+  ```
+
+  ```bash
+  # 验证安装
+  nilera@nilera-virtual-machine:~/Software/MySQL$ mysql -u root -p
+  ```
+
+### 网络框架
+
+#### ACL
+
+- ACL工程是一个跨平台的网络通信库及服务器编程框架，同时提供更多的实用功能库
+
+  - 如Linux、Windows、Solaris、MacOS、FreeBSD
+
+- 通过该库，用户可以非常容易地编写支持多种模式的服务器程序，WEB应用程序，数据库应用程序
+
+  - 多线程、多进程、非阻塞、触发器、UDP方式、协程方式
+
+- ACL提供常用客户端通信库
+
+  - HTTP、SMTP、ICMP、Redis、Memcache、Beanstalk、Handler Socket
+
+- ACL提供常用流式编解码库
+
+  - XML、JSON、MIME、BASE64、UUCODE、QPCODE、RFC2047
+
+- ACL的作者是郑树新（微博: http://weibo.com/zsxxsz）
+
+- 在项目目录下构建并安装ACL
+
+  **ACL 项目地址：**[ACL](https://github.com/acl-dev/)
+
+  ```bash
+  # 首先在 GitHub 下载 ACL
+  # 然后使用 unzip 命令解压
+  nilera@nilera-virtual-machine:~/Software/ACL$ unzip ../../SoftwarePackages/acl-master.zip -d ./
+  
+  # 在执行 make 指令之前需要安装 zlib 库, 使用下列命令安装
+  nilera@nilera-virtual-machine:~$ sudo apt-get install libz-dev
+  
+  nilera@nilera-virtual-machine:~/Software/ACL$ cd acl-master/
+  nilera@nilera-virtual-machine:~/Software/ACL/acl-master$ make
+  nilera@nilera-virtual-machine:~/Software/ACL/acl-master$ sudo make install
+  
+  begin copy file...
+  cp -f app/master/daemon/acl_master ./dist/master/libexec/linux64/
+  cp -f libacl_all.a ./dist/lib/linux64/
+  cp -f lib_acl/lib/libacl.a ./dist/lib/linux64/
+  cp -f lib_acl_cpp/lib/libacl_cpp.a ./dist/lib/linux64/
+  cp -f lib_protocol/lib/libprotocol.a ./dist/lib/linux64/
+  cp -Rf lib_acl/include/* ./dist/include/acl/
+  cp -Rf lib_protocol/include/* ./dist/include/protocol/
+  cp -Rf lib_acl_cpp/include/acl_cpp/* ./dist/include/acl_cpp/
+  
+  # 将库文件复制到 /usr/include/acl-lib 下
+  nilera@nilera-virtual-machine:~/Software/ACL/acl-master$ sudo mkdir -p /usr/include/acl-lib
+  nilera@nilera-virtual-machine:~/Software/ACL/acl-master$ sudo cp -rf ./dist/include/* /usr/include/acl-lib/
+  nilera@nilera-virtual-machine:~/Software/ACL/acl-master$ sudo cp -rf ./dist/lib/linux64/* /usr/lib
+  ```
+
+### 媒体框架
+
+#### VCL
+
+- VLC是一款免费、开源的跨平台多媒体播放器及框架，可播放大多数多媒体文件，以及DVD、音频CD、VCD及各类流媒体协议
+
+- **libVLC**是**VLC**所依赖的多媒体框架核心引擎及编程接口库，基于该库可以很容易地开发出与VLC具有相同功能集的多媒体应用
+
+- 在系统中安装**VLC**和**libVLC**
+  ```bash
+  nilera@nilera-virtual-machine:~/Software/ACL/acl-master$ sudo apt-get install vlc libvlc-dev
+  ```
+
+  
