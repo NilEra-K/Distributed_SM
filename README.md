@@ -10,7 +10,7 @@ _使用 C++ 实现一个**分布式流媒体**项目_
 - [x] 2023-12-04 创建 **Distributed_SM** 项目
 - [x] 2024-01-16 完成期末考试任务，重新开始更新 **Distributed_SM** 项目，因为期末考试的原因，GitHub已经一个月没有碰了，重新捡起来
 
-## [🍔]基础知识补充
+## [🍔] 基础知识补充
 
 **[⚾]** **简单了解单机服务器开发的概念**
 在同一台服务器上保存所有项目文件，不同类型的文件存放在不同子目录下，如下所示 :
@@ -83,7 +83,7 @@ FS:\app
 
 # 项目开发流程
 
-## [🍟]项目总体架构
+## [🍟] 项目总体架构
 <img src="./res/markdownRes/ProjectStructure.png">
 
 **跟踪服务器**
@@ -107,7 +107,7 @@ FS:\app
 - HTTP 服务器将客户机的下载功能包装在针对 HTTP 请求 GET 方法的处理中，直接将从存储服务器下载得到的文件内容数据以 HTTP 响应的形式回传给 HTTP 客户机
 - 后者可以是简单的 wget 命令，得到完整的离线媒体文件，也可以是任何支持 HTTP 协议的流媒体播放器，以实现在线实时播放
 
-## [📰]报文规约
+## [📰] 报文规约
 ### 跟踪服务器报文
 1. **存储服务器向跟踪服务器请求加入** 
 
@@ -214,11 +214,13 @@ ID 服务器采用键(`id`)-值(`id_value`)对的形式管理保存在每个存�
 
 - 不同用户上传的文件会被记录在不同的表中，表名的最后几个字符(xx)，由用户ID的哈希值计算得到：`t_file_01`、`t_file_02` 和 `t_file_03`
 
-## [🌄]开发环境
+## [🌄] 开发环境
 
 <img src="./res/markdownRes/DevEnv.png" style="float:left;" height="400">
 
-### 操作系统——Ubuntu
+### 操作系统
+
+#### Ubuntu
 
 1. **查看系统版本 :** 可以使用 `cat /proc/version`、`uname -a`、` lsb_release -a`命令查看Ubuntu的版本信息
 
@@ -513,4 +515,41 @@ ID 服务器采用键(`id`)-值(`id_value`)对的形式管理保存在每个存�
   nilera@nilera-virtual-machine:~/Software/ACL/acl-master$ sudo apt-get install vlc libvlc-dev
   ```
 
-  
+
+## [🏰] 项目结构
+
+<img src="D:\Distributed_SM\res\markdownRes\ProjectStructure_Mind.png" alt="项目结构" style="zoom:25%;" />
+
+### 目录结构
+
+```
+Distributed_SM
+│  LICENSE			许可
+│  README.md		说明
+├─bin				可执行程序
+├─data				数据
+├─docs				文档
+├─download			下载
+├─etc				配置文件
+├─lib				库
+├─res				资源文件
+│  └─markdownRes	用于写Markdown文件的资源
+├─sql				建表脚本
+├─src				源代码
+│  ├─01_common		公共模块
+│  ├─02_tracker		跟踪服务器
+│  ├─03_id			ID 服务器
+│  ├─04_storage		存储服务器
+│  ├─05_client		客户端
+│  ├─06_http		HTTP 服务器
+│  ├─install		安装脚本
+│  └─uninstall		卸载脚本
+└─upload			上传
+```
+
+### 代码结构
+
+![代码结构](D:\Distributed_SM\res\markdownRes\CodeStructure.png)
+
+## 详细设计
+
