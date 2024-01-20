@@ -102,7 +102,35 @@ int valid(const char* str) {
 
 // 以分号为分隔符, 将一个字符串拆分为多个子字符串
 // 使用 strtok 来完成这个函数
-int split(const char* str, std::vector<std::string>& substrs) {
+// 假设 字符串为 abc;def,;,xyz.123
+// 使用 分割符为 [;.,] 来进行分割, strtok 会把搜索到的分割符替换为 '\0', 使用这个函数时必须保证字符串可写(因为要写入'\0')
 
+// 分割过程如下:
+// s
+// v
+// abc;def,;,xyz.123    sep -> ";.,";   strtok(s, sep);     // 返回 p, ';' 被替换为 '\0'
+// ^
+// p
+//    ^
+//    q
+
+// abc@def,;,xyz.123    sep -> ";.,";   strtok(NULL, sep);  // @ 表示被替换为空字符 '\0'
+//     ^
+//     p
+//        ^
+//        q
+
+int split(const char* str, std::vector<std::string>& substrs) {
+    if (!str)   return ERROR;
+    size_t len = strlen(str);
+    if (!len)   return ERROR;
+    char* buf = new char[len + 1];
+    strcpy(buf, str);
+
+    const char* sep = ";";
+    for (char* substr = strtok(buf, sep); substr; substr = strtok(NULL, sep)) { // substr 为 NULL 是退出循环
+        substrs.push_back(substr);
+    }
+    delete[] buf;
     return OK;
 }
