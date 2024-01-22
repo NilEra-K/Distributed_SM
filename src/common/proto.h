@@ -37,10 +37,10 @@ typedef struct storage_join_body {
     char sjb_jtime[sizeof(time_t)];                 // 加入时间: 原因同上
 } storage_join_body_t;                              // 存储服务器加入包体
 
-typedef struct sotrage_beat_body {
+typedef struct storage_beat_body {
     char sbb_groupname[STORAGE_GROUPNAME_MAX + 1];  // 组名
     char sbb_hostname[STORAGE_HOSTNAME_MAX + 1];    // 主机名    
-} sotrage_beat_body_t;                              // 存储服务器心跳包体
+} storage_beat_body_t;                              // 存储服务器心跳包体
 
 // 命令
 #define CMD_TRACKER_JOIN        10  // 存储服务器向跟踪服务器发送加入包
