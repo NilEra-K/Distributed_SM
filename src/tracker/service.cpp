@@ -1,5 +1,6 @@
 // 跟踪服务器
 // 实现业务服务类
+// 迭代器复习: https://blog.csdn.net/weixin_38278993/article/details/104417489
 #include <algorithm>
 #include "proto.h"
 #include "utils.h"
@@ -266,19 +267,152 @@ bool service_c::groups(acl::socket_stream* conn) const {
 // 将存储服务器加入组表
 int service_c::join(const storage_join_t* sj, const char* saddr) const {
     // 互斥锁加锁
+    if ((errno = pthread_mutex_lock(&g_mutex))) { // errno 为 0 时表示正常返回
+        logger_error("Call `pthread_mutex_lock` Fail: %s", strerror(errno));
+        return ERROR;
+    } 
     
     // 在组表中查找待加入存储服务器所隶属的组
+    std::map<std::string, std::list<storage_info_t>>::iterator group;   // 需要完成一些加入、更新操作, 因此这里不能使用只读迭代器
+    group = g_groups.find(sj->sj_groupname);
+
+    if (group != g_groups.end()) { // 若找到该组
+        // 遍历该组的存储服务器列表
+        std::list<storage_info_t>::iterator si;
+        for (si = group->second.begin(); si != group->second.end(); ++si) {
+            // 若待加入的存储服务器已在该列表中
+            if (!strcmp(si->si_hostname, sj->sj_hostname) && !strcmp(si->si_addr, saddr)) {
+                // 更新该列表中的相应记录
+                strcpy(si->si_version, sj->sj_version); // 更新版本
+                si->si_port   = sj->sj_port;            // 更新端口号
+                si->si_stime  = sj->sj_stime;           // 更新启动时间
+                si->si_jtime  = sj->sj_jtime;           // 更新加入时间
+                si->si_btime  = sj->sj_jtime;           // 更新心跳时间, 可以将"加入"理解为一次"心跳", 所以加入时间=心跳时间
+                si->si_status = STORAGE_STATUS_ONLINE;  // 状态
+                break;
+            }
+        }
+
+        // 若带加入的存储服务器不在该列表中
+        if (si == group->second.end()) {
+            // 将待加入存储服务器加入该列表, 这里也使用了 si, 区别内部作用域和外部作用域关系
+            // 内部作用域隐藏外部作用域
+            storage_info_t si;
+            strcpy(si.si_version,   sj->sj_version);    // 版本
+            strcpy(si.si_hostname,  sj->sj_hostname);   // 主机名
+            strcpy(si.si_addr,      saddr);             // IP 地址
+            si.si_port   = sj->sj_port;                 // 端口号
+            si.si_stime  = sj->sj_stime;                // 启动时间
+            si.si_jtime  = sj->sj_jtime;                // 加入时间
+            si.si_btime  = sj->sj_jtime;                // 心跳时间
+            si.si_status = STORAGE_STATUS_ONLINE;       // 状态
+            group->second.push_back(si);
+        }
+    } else { // 若没有该组
+        // 将待加入存储服务器所隶属的组加入组表
+        g_groups[sj->sj_groupname] = std::list<storage_info_t>();
+
+        // 将待加入存储服务器加入该组的存储服务器列表
+        storage_info_t si;
+        strcpy(si.si_version,   sj->sj_version);    // 版本
+        strcpy(si.si_hostname,  sj->sj_hostname);   // 主机名
+        strcpy(si.si_addr,      saddr);             // IP 地址
+        si.si_port   = sj->sj_port;                 // 端口号
+        si.si_stime  = sj->sj_stime;                // 启动时间
+        si.si_jtime  = sj->sj_jtime;                // 加入时间
+        si.si_btime  = sj->sj_jtime;                // 心跳时间
+        si.si_status = STORAGE_STATUS_ONLINE;       // 状态
+        g_groups[sj->sj_groupname].push_back(si);
+    }
+    
+    // 互斥锁解锁
+    if ((errno = pthread_mutex_unlock(&g_mutex))) {
+        logger_error("Call `pthread_mutex_unlock` Fail: %s", strerror(errno));
+        return ERROR;
+    }    
     return OK;
 }
 
 // 将存储服务器标记为活动
 int service_c::beat(const char* groupname, const char* hostname, const char* saddr) const {
+    // 互斥锁加锁
+    if ((errno = pthread_mutex_lock(&g_mutex))) { // errno 为 0 时表示正常返回
+        logger_error("Call `pthread_mutex_lock` Fail: %s", strerror(errno));
+        return ERROR;
+    } 
+    
+    int result = OK;    // 因为有加锁操作, 所以定义 result 来保存最后的返回值, 如果提前返回会导致互斥锁无法解锁
 
-    return OK;
+    // 在组表中查找待加入存储服务器所隶属的组
+    std::map<std::string, std::list<storage_info_t>>::iterator group;   // 需要完成一些加入、更新操作, 因此这里不能使用只读迭代器
+    group = g_groups.find(groupname);
+
+    if (group != g_groups.end()) { // 若找到该组
+        // 遍历该组的存储服务器列表
+        std::list<storage_info_t>::iterator si;
+        for (si = group->second.begin(); si != group->second.end(); ++si) {
+            // 若待加入的存储服务器已在该列表中
+            if (!strcmp(si->si_hostname, hostname) && !strcmp(si->si_addr, saddr)) {
+                // 更新该列表中的相应记录
+                si->si_btime  = time(NULL);             // 更新心跳时间
+                si->si_status = STORAGE_STATUS_ONLINE;  // 状态
+                break;
+            }
+        }
+
+        // 若带加入的存储服务器不在该列表中
+        if (si == group->second.end()) {
+            logger_error("Storage Not Found, Groupname: %s, Hostname: %s, Saddrs: %s", groupname, hostname, saddr);
+            result = ERROR;
+        }
+    } else { // 若没有该组
+        logger_error("Group Not Found, Groupname: %s", groupname);
+        result = ERROR;
+    }
+    
+    // 互斥锁解锁
+    if ((errno = pthread_mutex_unlock(&g_mutex))) {
+        logger_error("Call `pthread_mutex_unlock` Fail: %s", strerror(errno));
+        return ERROR;
+    }    
+    return result;
 }
 
 // 响应客户机存储服务器地址列表
 int service_c::saddrs(acl::socket_stream* conn, const char* appid, const char* userid) const {
+    // 验证应用ID是否合法
+    if (valid(appid) != OK) {
+        error(conn, -1, "Invalid APPID: %s", appid);
+        return ERROR;
+    }
+
+    // 验证应用ID是否存在
+    if (std::find(g_appids.begin(), g_appids.end(), appid) == g_appids.end()) {
+        error(conn, -1, "Unknownn APPID: %s", appid);
+        return ERROR;
+    }
+
+    // 根据用户ID获取其对应组名
+    std::string groupname;
+    if(group_of_user(appid, userid, groupname) != OK) { // 为什么需要传入 `appid`
+                                                        // 防止无法查询到 `userid`, 返回一个空组名, 此时需要插入一条相关记录完成随机组的分配
+                                                        // 而这个操作需要使用 `appid`
+        error(conn, -1, "Grt Groupname Fail...");
+        return ERROR;
+    }
+
+    // 根据组名获取存储服务器地址列表
+    std::string saddrs;
+    if (saddrs_of_group(groupname.c_str(), saddrs) != OK) {
+        error(conn, -1, "Get Storage Address Fail...");
+        return ERROR;
+    }
+
+    // 构造响应
+    // |包体长度|命令|状态|组名|存储服务器地址列表|
+    // |   8   | 1 | 1 |      包体长度       |
+
+    // 发送响应
 
     return OK;
 }
@@ -290,7 +424,7 @@ int service_c::group_of_user(const char* appid, const char* userid, std::string&
 }
 
 // 根据组名获取存储服务器地址列表
-int service_c::saddr_of_group(const char* groupname, std::string& saddrs) const {
+int service_c::saddrs_of_group(const char* groupname, std::string& saddrs) const {
 
     return OK;
 }

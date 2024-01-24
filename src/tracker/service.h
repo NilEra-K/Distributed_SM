@@ -31,7 +31,7 @@ private:
     // 根据用户ID获取其对应组名
     int group_of_user(const char* appid, const char* userid, std::string& groupname) const;
     // 根据组名获取存储服务器地址列表
-    int saddr_of_group(const char* groupname, std::string& saddrs) const;
+    int saddrs_of_group(const char* groupname, std::string& saddrs) const;
     
     // 应答成功
     bool ok(acl::socket_stream* conn) const;
