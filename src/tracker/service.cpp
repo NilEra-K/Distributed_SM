@@ -45,6 +45,7 @@ bool service_c::business(acl::socket_stream* conn, const char* head) const {
         error(conn, -1, "Unknown Command: %d", command);
         return false;
     }
+    return result;
 }
 
 /* 二级方法 */
@@ -173,6 +174,7 @@ bool service_c::saddrs(acl::socket_stream* conn, long long bodylen) const {
     if (saddrs(conn, appid, userid) != OK) {
         return false;
     }
+    return true;
 }
 
 // 处理来自客户机的获取组列表请求
@@ -260,7 +262,10 @@ bool service_c::groups(acl::socket_stream* conn) const {
     // 发送响应
     if (conn->write(resp, resplen) < 0) {
         logger_error("Write Fail: %s, Respone Length: %lld, To: %s", acl::last_serror(), resplen, conn->get_peer());
+        return false;
     }
+
+    return true;
 }
 
 /* 三级方法 */
@@ -407,36 +412,170 @@ int service_c::saddrs(acl::socket_stream* conn, const char* appid, const char* u
         error(conn, -1, "Get Storage Address Fail...");
         return ERROR;
     }
+    logger("Appid: %s, Userid: %s, Groupname: %s, Saddrs: %s", appid, userid, groupname.c_str(), saddrs.c_str());
 
     // 构造响应
     // |包体长度|命令|状态|组名|存储服务器地址列表|
     // |   8   | 1 | 1 |      包体长度       |
+    long long bodylen = STORAGE_GROUPNAME_MAX + 1 + saddrs.size() + 1;
+    long long resplen = HEADLEN + bodylen;
+    char resp[resplen] = {};
+    llton(bodylen, resp);
+    resp[BODYLEN_SIZE] = CMD_TRACKER_REPLY;
+    resp[BODYLEN_SIZE + COMMAND_SIZE] = 0;
+    strncpy(resp + HEADLEN, groupname.c_str(), STORAGE_GROUPNAME_MAX);
+    strcpy(resp + HEADLEN + STORAGE_GROUPNAME_MAX + 1, saddrs.c_str());
 
     // 发送响应
+    if (conn->write(resp, resplen) < 0) {
+        logger_error("Write Fail: %s, resplen: %lld, To: %s", acl::last_serror(), resplen, conn->get_peer());
+        return ERROR;
+    }
 
     return OK;
 }
 
 // 根据用户ID获取其对应组名
 int service_c::group_of_user(const char* appid, const char* userid, std::string& groupname) const {
+    // 数据库访问对象
+    db_c db;
 
+    // 连接数据库
+    if (db.connect() != OK) {
+        return ERROR;
+    }
+
+    // 根据用户ID获取对应的组名
+    if (db.get(userid, groupname) != OK)
+        return ERROR;
+
+    // 组名为空表示该用户没有组, 为其分配一个
+    if (groupname.empty()) {
+        logger("Groupname is Empty, Appid: %s, Userid: %s, Allocate One :)", appid, userid);
+        // 获取全部组名
+        std::vector<std::string> groupnames;
+        if (db.get(groupnames) != OK) {
+            return ERROR;
+        }
+        if (groupnames.empty()) {
+            logger_error("Groupnames is Empty, Appid: %s, Userid: %s, Allocate One", appid, userid);
+            return ERROR;
+        }
+
+        // 随机抽取组名
+        srand(time(NULL));
+        groupname = groupnames[rand() % groupnames.size()];
+
+        // 设置用户ID和组名的对应关系
+        if (db.set(appid, userid, groupname.c_str()) != OK) {
+            return ERROR;
+        }
+    }
     return OK;
 }
 
 // 根据组名获取存储服务器地址列表
 int service_c::saddrs_of_group(const char* groupname, std::string& saddrs) const {
+    // 互斥锁加锁
+    if ((errno = pthread_mutex_lock(&g_mutex))) { // errno 为 0 时表示正常返回
+        logger_error("Call `pthread_mutex_lock` Fail: %s", strerror(errno));
+        return ERROR;
+    } 
 
-    return OK;
+    int result = OK;
+
+    // 根据组名在组表中查找特定组
+    std::map<std::string, std::list<storage_info_t>>::const_iterator group = g_groups.find(groupname);
+    if (group != g_groups.end()) { // 若找到该组
+        if (!group->second.empty()) { // 若该组的存储服务器列表非空
+            // 在该组的存储服务器列表中, 从随机位置开始最多抽取三个处于活动状态的存储服务器
+            srand(time(NULL));
+            int nsis = group->second.size();    // Num Of `storage_info_t` s -> nsis
+            int nrand = rand() % nsis;
+            std::list<storage_info_t>::const_iterator si = group->second.begin();
+            int nacts = 0;                      // Num Of Active Status
+            for (int i = 0; i < nsis + nrand; ++i, ++si) {
+                if (si == group->second.end()) { // 构成环状, 当迭代器指向末尾的时候
+                    si = group->second.begin();
+                }
+                logger("i: %d, nrand: %d, addr: %s, port: %u, status: %d", i, nrand, si->si_addr, si->si_port, si->si_status);
+                if (i >= nrand && si->si_status == STORAGE_STATUS_ACTIVE) {
+                    char saddr[256];
+                    sprintf(saddr, "%s:%d", si->si_addr, si->si_port);
+                    saddrs += saddr;
+                    saddrs += ";";
+                    if (++nacts >= 3)   break;
+                }
+            }
+
+            if (!nacts) { // 若没有处于活动状态的存储服务器
+                // 错误处理
+                logger_error("No Active Storage IN Group: %s", groupname);
+                result = ERROR;
+            }
+        } else { // 若该组的存储服务器列表为空
+            // 错误处理
+            logger_error("No Storage IN Group: %s", groupname);
+            result = ERROR;
+        }
+    } else { // 若没找到该组
+        // 错误处理
+        logger_error("No Found Group: %s", groupname);
+        result = ERROR;
+    }
+
+    // 互斥锁解锁
+    if ((errno = pthread_mutex_unlock(&g_mutex))) {
+        logger_error("Call `pthread_mutex_unlock` Fail: %s", strerror(errno));
+        return ERROR;
+    }
+
+    return result;
 }
 
 // 应答成功
 bool service_c::ok(acl::socket_stream* conn) const {
+    // |包体长度|命令|状态|
+    // |   8   | 1 | 1 |
+    // 构造响应
+    long long bodylen = 0;
+    long long resplen = HEADLEN + bodylen;
+    char resp[resplen] = {};
+    llton(bodylen, resp);
+    resp[BODYLEN_SIZE] = CMD_TRACKER_REPLY;
+    resp[BODYLEN_SIZE + COMMAND_SIZE] = 0;
 
-    return OK;
+    // 发送响应
+    if (conn->write(resp, resplen) < 0) {
+        logger_error("Write Fail: %s, Resplen: %lld, To: %s", acl::last_serror(), resplen, conn->get_peer());
+        return false;
+    }
+    return true;
 }
 
 // 应答错误
 bool service_c::error(acl::socket_stream* conn, short errnumb, const char* format, ...) const {
+    // 错误描述
+    char errdesc[ERROR_DESC_MAX];
+    va_list ap;
+    va_start(ap, format);   // 表示从 `format` 参数后面开始获取变长参数表, 并放到 `ap` 中
+                            // 因为 `...` 没有名字, 是无法表示的
+    vsnprintf(errdesc, ERROR_DESC_MAX, format, ap); // 使用 `vsnprintf()` 函数
+                                                    // errdesc:         表明输出函数的错误描述
+                                                    // ERROR_DESC_MAX:  表明输出的最大长度, 这个形参表明其输出最多不能超过 ERROR_DESC_MAX 个字节
+    va_end(ap);
+    logger_error("%s", errdesc);
+    acl::string desc;
+    desc.format("[%s] %s", g_hostname.c_str(), errdesc);
+    memset(errdesc, 0, sizeof(errdesc));        // 将已开辟内存空间`errdesc`的首 `sizeof(errdesc)` 个字节的值设置为 `0`
+    strncpy(errdesc, desc.c_str(), ERROR_DESC_MAX - 1); // 将 `desc.c_str()`
+
+    // |包体长度|命令|状态|错误号|错误描述|
+    // |   8   | 1 | 1 |  2  | <=1024|
+    // 构造响应
+    
+
+    // 发送响应
 
     return OK;
 }
