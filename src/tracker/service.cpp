@@ -557,25 +557,47 @@ bool service_c::ok(acl::socket_stream* conn) const {
 bool service_c::error(acl::socket_stream* conn, short errnumb, const char* format, ...) const {
     // 错误描述
     char errdesc[ERROR_DESC_MAX];
+
+    // va -> va_start -> va_end 是使用 `va_list` 必须经历的几个步骤
     va_list ap;
     va_start(ap, format);   // 表示从 `format` 参数后面开始获取变长参数表, 并放到 `ap` 中
                             // 因为 `...` 没有名字, 是无法表示的
+
     vsnprintf(errdesc, ERROR_DESC_MAX, format, ap); // 使用 `vsnprintf()` 函数
                                                     // errdesc:         表明输出函数的错误描述
                                                     // ERROR_DESC_MAX:  表明输出的最大长度, 这个形参表明其输出最多不能超过 ERROR_DESC_MAX 个字节
-    va_end(ap);
+    va_end(ap);             // 释放缓冲区
+
     logger_error("%s", errdesc);
     acl::string desc;
     desc.format("[%s] %s", g_hostname.c_str(), errdesc);
-    memset(errdesc, 0, sizeof(errdesc));        // 将已开辟内存空间`errdesc`的首 `sizeof(errdesc)` 个字节的值设置为 `0`
-    strncpy(errdesc, desc.c_str(), ERROR_DESC_MAX - 1); // 将 `desc.c_str()`
+    memset(errdesc, 0, sizeof(errdesc));                // 将已开辟内存空间`errdesc`的首 `sizeof(errdesc)` 个字节的值设置为 `0`
+    strncpy(errdesc, desc.c_str(), ERROR_DESC_MAX - 1); // 将 `desc.c_str()` 复制到 `errdesc` 中, 复制长度为 `ERROR_DESC_MAX - 1`
+                                                        // 使用该方法复制不包含 `\0` 字符, 为了保证有位置添加'\0', 需要保证有一个位置的空余
+    size_t desclen = strlen(errdesc);
+    desclen += (desclen != 0);  // 当错误描述为空的时候 `+0`, 表示直接舍弃该部分, 不需要这一部分
+                                // 当错误描述非空的时候 `+1`, 表示需要在其后添加一个 `\0` 字符
 
     // |包体长度|命令|状态|错误号|错误描述|
     // |   8   | 1 | 1 |  2  | <=1024|
     // 构造响应
-    
+    long long bodylen = ERROR_NUMB_SIZE + desclen;
+    long long resplen = HEADLEN + bodylen;
+    char resp[resplen] = {};                                // |--------|-|-|--|-----|
+    llton(bodylen, resp);                                   // |########|-|-|--|-----|
+    resp[BODYLEN_SIZE] = CMD_TRACKER_REPLY;                 // |########|#|-|--|-----|
+    resp[BODYLEN_SIZE + COMMAND_SIZE] = STATUS_ERROR;       // |########|#|#|--|-----|
+    ston(errnumb, resp + HEADLEN);                          // |########|#|#|##|-----|
+    if (desclen) {                                          // |########|#|#|##|#####|  当 `desclen` 不为 `0` 时执行 `if` 代码
+        strcpy(resp + HEADLEN + ERROR_NUMB_SIZE, errdesc);  //              ^
+                                                            //              |错误号|错误描述| 
+    }
 
     // 发送响应
+    if (conn->write(resp, resplen) < 0) {
+        logger_error("Write Fail: %s, Resplen: %lld, To: %s", acl::last_serror(), resplen, conn->get_peer());
+        return false;
+    }
 
     return OK;
 }
