@@ -145,18 +145,19 @@ bool server_c::thread_on_read(acl::socket_stream* conn) {
     }
 
     // 业务处理
-
-    return true;
+    service_c service;
+    return service.business(conn, head);
 }
 
 // 当连接发生读写超时时被调用
 // 一个线程长时间没有读操作, 写操作, 也没有出现错误, 长时间处于无声无息的状态
 bool server_c::thread_on_timeout(acl::socket_stream* conn) {
-    return true;
+    logger("Read Timeout, From: %s", conn->get_peer());
+    return true;    // 这里返回 `true` 表示保持连接
 }
 
 // 当连接关闭时候被调用
 void server_c::thread_on_close(acl::socket_stream* conn) {
-
+    logger("Client Disconnect, From: %s", conn->get_peer());
 }
 
