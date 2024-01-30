@@ -21,7 +21,7 @@
 // |    8    |  1  |  1  |   16   |  256  |  128  |
 #define APPID_SIZE  16      // 应用ID字段最大字节数(含空字符)
 #define USERID_SIZE 256     // 用户ID字段最大字节数(含空字符)
-#define FILEID_ID   128     // 文件ID字段最大字符数(含空字符)
+#define FILEID_SIZE 128     // 文件ID字段最大字符数(含空字符)
 
 // 对于包体存在很多个字段, 可以使用结构体
 // 存储服务器加入包和心跳包
