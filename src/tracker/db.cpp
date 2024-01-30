@@ -22,7 +22,7 @@ int db_c::connect(void) {
     // 有连接状态的MySQL指针  无连接状态的MySQL指针
     // 因为我们无法保证MySQL服务器一旦连接就可以连接成功, 所以我们应该遍历MySQL列表, 尝试连接数据库
     for (std::vector<std::string>::const_iterator maddr = g_maddrs.begin(); maddr != g_maddrs.end(); ++maddr) {
-        if (m_mysql = mysql_real_connect(mysql, maddr->c_str(), "root", "123456", "tnv_trackerdb", 0, NULL, 0))
+        if ((m_mysql = mysql_real_connect(mysql, maddr->c_str(), "root", "123456", "tnv_trackerdb", 0, NULL, 0)))
             return OK;
     }
     logger_error("Connect Database Fail: %s", mysql_error(m_mysql = mysql));

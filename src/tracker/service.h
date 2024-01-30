@@ -37,4 +37,4 @@ private:
     bool ok(acl::socket_stream* conn) const;
     // 应答错误
     bool error(acl::socket_stream* conn, short errnumb, const char* format, ...) const;
-};
+}; 
