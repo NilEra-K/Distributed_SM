@@ -19,7 +19,7 @@ acl::master_int_tbl cfg_int[]{   // 整型配置表, master_int_tbl 实际为结
     {0, 0, 0, 0, 0}
 };
 
-std::vector<std::string> g_maddrs;   // 默认无参构造
-std::string g_hostname;              // 默认无参构造
+std::vector<std::string> g_maddrs;   // 默认无参构造, MySQL 地址表
+std::string g_hostname;              // 默认无参构造, 主机名
 std::vector<id_pair_t> g_ids;        // ID 表
 pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;         // 互斥锁初始化为无锁状态
