@@ -71,11 +71,12 @@ bool service_c::get(acl::socket_stream* conn, long long bodylen) const {
 long service_c::get(const char* key) const {
     // 互斥锁加锁
     if ((errno = pthread_mutex_lock(&g_mutex))) {
-        logger_error("Call `pthread_mutex_lock` Fail: %s", strerror);
+        logger_error("Call `pthread_mutex_lock` Fail: %s", strerror(errno));
         return -1;
     }
 
     long value = -1;
+
     // 在ID表中查找ID
     std::vector<id_pair_t>::iterator id;
     for (id = g_ids.begin(); id != g_ids.end(); ++id) {
@@ -94,21 +95,60 @@ long service_c::get(const char* key) const {
             id->id_value = value;
             id->id_offset = 1;
         }
-    } else if ((value = fromdb(key)) >= 0) { // 未找到该ID
-        // 从数据库中获取ID值
-            // 在ID表中添加ID
-    }    
+    } else if ((value = fromdb(key)) >= 0) { // 未找到该ID, 从数据库中获取ID值
+        // 在ID表中添加ID
+        id_pair_t id;
+        strcpy(id.id_key, key);
+        id.id_value = value;
+        id.id_offset = 1;
+        g_ids.push_back(id);
+    }
+
     // 互斥锁解锁
-    return 0;
+    if ((errno = pthread_mutex_unlock(&g_mutex))) {
+        logger_error("Call `pthread_mutex_unlock` Fail: %s", strerror(errno));
+        return -1;
+    }
+    return value;
 }
 
 // 从数据库中获取ID值
 long service_c::fromdb(const char* key) const {
-    return 0;
+    // 创建数据库访问对象
+    db_c db;
+
+    // 连接数据库
+    if (db.connect() != OK) {
+        return -1;
+    }
+
+    long value = -1;
+
+    // 获取ID当前值, 同时产生下一个值
+    if (db.get_id(key, cfg_maxoffset, &value) != OK) {
+        return -1;
+    }
+    return value;
 }
 
 // 应答成功->应答ID
 bool service_c::id(acl::socket_stream* conn, long value) const {
+    // | 包体长度 | 命令 | 状态 | ID值 |
+    // |    8    |  1  |  1   |  8  |
+    // 构造响应
+    long long bodylen = BODYLEN_SIZE;
+    long long resplen = HEADLEN + bodylen;
+    char resp[resplen] = {};
+    llton(bodylen, resp);
+    resp[BODYLEN_SIZE] = CMD_ID_REPLY;      // 命令
+    resp[BODYLEN_SIZE + COMMAND_SIZE] = 0;  // 状态
+    llton(value, resp + HEADLEN);           // ID值
+
+    // 发送响应
+    if (conn->write(resp, resplen) < 0) {
+        logger_error("Write Fail: %s, Resplen: %lld, To: %s", acl::last_serror(), resplen, conn->get_peer());
+        return false;
+    }
     return true;
 }
 
