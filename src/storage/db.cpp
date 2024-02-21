@@ -33,7 +33,62 @@ int db_c::connect(void) {
 // 根据 文件ID 获取其对应的 路径及大小
 int db_c::get(const char* appid, const char* userid, const char* fileid, std::string& filepath, long long* filesize) const {
     // 先尝试从缓存中获取与文件ID对应的路径及大小
+    // uid:fid:<用户ID>:<文件ID> -> <文件大小>;<文件路径>
+    //                     Key -> Value(size_path)
+    cache_c cache;
+    acl::string key;
+    key.format("uid:fid:%s:%s", userid, fileid);
+    acl::string value;
+
+    if (cache.get(key, value) == OK) {
+        std::vector<acl::string> size_path = value.split2(";"); // size_path 表示 文件大小(size) 和 文件路径(path)
+        if (size_path.size() == 2) {
+            filepath = size_path[1].c_str();
+            *filesize = atoll(size_path[0].c_str());
+            if (!filepath.empty() && *filesize > 0) {
+                logger("From Cache, Appid: %s, Userid: %s, Fileid: %s, File Path: %s, File Size: %lld", appid, userid, fileid, filepath.c_str(), *filesize);
+                return OK;
+            }
+        }        
+    }
+
+    // 缓存中没有再查询数据库
+    std::string tablename = table_of_user(userid);
+    if (tablename.empty()) {
+        logger_error("Table Name is Empty, Appid: %s, Userid: %s, Fileid: %s", appid, userid, fileid);
+        return ERROR;
+    }
     
+    acl::string sql;
+    sql.format("SELECT * file_path, file_size FROM %s WHERE id='%s';", tablename.c_str(), fileid);
+    if (mysql_query(m_mysql, sql.c_str())) {
+        logger_error("Query Database Fail: %s, SQL: %s", mysql_error(m_mysql), sql.c_str());
+        return ERROR;
+    }
+
+    // 获取查询结果
+    MYSQL_RES* res = mysql_store_result(m_mysql);
+    if (!res) {
+        logger_error("Result is NULL: %s, SQL: %s", mysql_error(m_mysql), sql.c_str());
+        return ERROR;
+    }
+
+    // 获取结果记录
+    MYSQL_ROW row = mysql_fetch_row(res);
+    if (!row) {
+        logger_error("Result is Empty: %s, SQL: %s", mysql_error(m_mysql), sql.c_str());
+        return ERROR;
+    }
+
+    filepath = row[0];
+    *filesize = atoll(row[1]);
+    logger("From Database, Appid: %s, Userid: %s, Fileid: %s, Filepath: %s, Filesize: %lld", appid, userid, fileid, filepath.c_str(), *filesize);
+
+    // 将文件ID和路径及大小的对应关系保存在缓存中
+    value.format("%lld;%s", *filesize, filepath.c_str());
+    cache.set(key, value.c_str());
+    
+
     return OK;
 }
 
