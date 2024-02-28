@@ -23,7 +23,7 @@ private:
     // 生成文件路径
     int genpath(char* filepath) const;
     // 将ID转换为512进制
-    int id512(long id) const;
+    long id512(long id) const;
     // 用文件ID生成文件路径
     // -spath: 存储路径 -fileid: 文件ID -filepath: 输出型参数
     int id2path(const char* spath, long fileid, char* filepath) const;

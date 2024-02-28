@@ -156,34 +156,206 @@ bool service_c::filesize(acl::socket_stream* conn, long long bodylen) const {
     // 构造响应
     bodylen = BODYLEN_SIZE;
     long long resplen = HEADLEN + bodylen;
-
+    char resp[resplen] = {};
+    llton(bodylen, resp);
+    resp[BODYLEN_SIZE] = CMD_STORAGE_REPLY;
+    resp[BODYLEN_SIZE + COMMAND_SIZE] = 0;
+    llton(filesize, resp + HEADLEN);
 
     // 发送响应
+    if (conn->write(resp, resplen) < 0) {
+        logger_error("Write Fail: %s, Resplen: %lld, TO: %s", acl::last_serror(), resplen, conn->get_peer());
+        return false;
+    }
 
     return true;
 }
 
 // 处理来自客户机的下载文件请求
 bool service_c::download(acl::socket_stream* conn, long long bodylen) const {
+    // | 包体长度 | 命令 | 状态 | 应用ID | 用户ID | 文件ID | 偏移 | 大小 |
+    // |    8    |  1  |  1  |   16   |  256  |  128  |   8  |  8  |
+    // 检查包体长度
+    long long expected = APPID_SIZE + USERID_SIZE + FILEID_SIZE + BODYLEN_SIZE + BODYLEN_SIZE;
+    if (bodylen != expected) {
+        error(conn, -1, "Invalid Body Length: %lld < %lld", bodylen, expected);
+        return false;
+    }
 
+    // 接收包体
+    char body[bodylen];
+    if (conn->read(body, bodylen) < 0) {
+        logger_error("Read Fail: %s, Bodylen: %lld, FROM: %s", acl::last_serror(), bodylen, conn->get_peer());
+        return false;
+    }
+
+    // 解析包体
+    char appid[APPID_SIZE];
+    strcpy(appid, body);
+    char userid[USERID_SIZE];
+    strcpy(userid, body + APPID_SIZE);
+    char fileid[FILEID_SIZE];
+    strcpy(fileid, body + APPID_SIZE + USERID_SIZE);
+    long long offset = ntoll(body + APPID_SIZE + USERID_SIZE + FILEID_SIZE);
+    long long size = ntoll(body + APPID_SIZE + USERID_SIZE + FILEID_SIZE + BODYLEN_SIZE);
+
+    // 数据库访问对象
+    db_c db;
+
+    // 连接数据库
+    if (db.connect() != OK) {
+        return false;
+    }
+
+    // 文件路径
+    std::string filepath;
+
+    // 文件大小
+    long long filesize;
+
+    // 根据文件ID获取其对应的路径及大小
+    if (db.get(appid, userid, fileid, filepath, &filesize) != OK) {
+        error(conn, -1, "Read Database Fail, Fileid: %s", fileid);
+        return false;
+    }
+
+    // 检查位置
+    if (offset < 0 || filesize < offset) {
+        logger_error("Invalid Offset, %lld is NOT Between 0 AND %lld", offset, filesize);
+        error(conn, -1, "Invalid Offset, %lld is NOT Between 0 AND %lld", offset, filesize);
+        return false;
+    }
+
+    // 大小为零表示下载文件直到文件尾
+    if (!size) {
+        size = filesize - offset;   // 实际的下载大小
+    }
+
+    // 检查大小
+    if (size < 0 || filesize - offset < size) {
+        logger_error("Invalid Size, %lld is NOT Between 0 AND %lld", size, filesize - offset);
+        error(conn, -1, "Invalid Offset, %lld is NOT Between 0 AND %lld", size, filesize - offset);
+        return false;
+    }
+
+    logger("Function `download`, Appid: %s, Userid: %s, Fileid: %s, Offset: %lld, Size: %lld, Filepath: %s, Filesize: %lld", appid, userid, fileid, offset, size, filepath.c_str(), filesize);
+
+    // 读取并发送文件
+    int result = send(conn, filepath.c_str(), offset, size);
+    if (result == SOCKET_ERROR) { // 套接字错误即表示无法通信, 直接返回 false 即可
+        return false;
+    } else if (result == ERROR) { // 本地错误还需要回复差错报文
+        error(conn, -1, "Receive and Save File Fail, Fileid: %s", fileid);
+        return false;
+    }
     return true;
 }
 
 // 处理来自客户机的删除文件请求
 bool service_c::del(acl::socket_stream* conn, long long bodylen) const {
+    // | 包体长度 | 命令 | 状态 | 应用ID | 用户ID | 文件ID |
+    // |    8    |  1  |  1  |   16   |  256  |  128  |
+    // 检查包体长度
+    long long expected = APPID_SIZE + USERID_SIZE + FILEID_SIZE;
+    if (bodylen != expected) {
+        error(conn, -1, "Invalid Body Length: %lld < %lld", bodylen, expected);
+        return false;
+    }
 
-    return true;
+    // 接收包体
+    char body[bodylen];
+    if (conn->read(body, bodylen) < 0) {
+        logger_error("Read Fail: %s, Bodylen: %lld, FROM: %s", acl::last_serror(), bodylen, conn->get_peer());
+        return false;
+    }
+
+    // 解析包体
+    char appid[APPID_SIZE];
+    strcpy(appid, body);
+    char userid[USERID_SIZE];
+    strcpy(userid, body + APPID_SIZE);
+    char fileid[FILEID_SIZE];
+    strcpy(fileid, body + APPID_SIZE + USERID_SIZE);
+
+    // 数据库访问对象
+    db_c db;
+
+    // 连接数据库
+    if (db.connect() != OK) {
+        return false;
+    }
+
+    // 文件路径
+    std::string filepath;
+
+    // 文件大小
+    long long filesize;
+
+    // 根据文件ID获取其对应的路径及大小
+    if (db.get(appid, userid, fileid, filepath, &filesize) != OK) {
+        error(conn, -1, "Read Database Fail, Fileid: %s", fileid);
+        return false;
+    }
+
+    // 删除文件ID
+    if (db.del(appid, userid, fileid) != OK) {
+        error(conn, -1, "Delete Database Fail, Fileid: %s", fileid);
+        return false;
+    }
+
+    // 删除文件
+    if (file_c::del(filepath.c_str()) != OK) {
+        error(conn, -1, "Delete File Fail, Fileid: %s", fileid);
+        return false;
+    }
+
+    logger("Function `del`, Delete File Success, Appid: %s, Userid: %s, Fileid: %s, Filepath: %s, Filesize: %lld", appid, userid, fileid, filepath.c_str(), filesize);
+    
+    return ok(conn);
 }
 
 /* 三级方法 */
 // 生成文件路径
+// mount
+// data1 -> /dev/sda1
+// data2 -> /dev/sda2
+// data3 -> /dev/sda3
+// ../data3/000/000/000/xxxx_000
+// ../data3/000/000/000/xxxx_001
+// ../data3/000/000/000/xxxx_002
+//                          .
+//                          .
+//                          .
+// ../data3/000/000/000/xxxx_511 // 进位
+// ../data3/000/000/001/xxxx_000
 int service_c::genpath(char* filepath) const {
-    return OK;
+    // 从存储路径表中随机抽取一个存储路径
+    srand(time(NULL));
+    int nspaths = g_spaths.size();
+    int nrand = rand() % nspaths;
+    std::string spath = g_spaths[nrand];
+
+    // 以存储路径为键从ID服务器获取与之对应的值作为文件ID
+    id_c id;
+    long fileid = id.get(spath.c_str());
+    if (fileid < 0) {
+        return ERROR;
+    }
+
+    // 先将文件ID转换为512进制, 再根据他生成文件路径
+    return id2path(spath.c_str(), id512(fileid), filepath);
 }
 
 // 将ID转换为512进制
-int service_c::id512(long id) const {
-    return 0;
+long service_c::id512(long id) const {
+    // aaa bbb ccc ddd
+    // aaa*512^3 + bbb*512^2 + ccc*512 + ddd = id
+    long result = 0;
+    for (int i = 1; id; i *= 1000) {
+        result += (id % 512) * i;
+        id /= 512;
+    }
+    return result;
 }
 
 // 用文件ID生成文件路径
