@@ -360,12 +360,71 @@ long service_c::id512(long id) const {
 
 // 用文件ID生成文件路径
 int service_c::id2path(const char* spath, long fileid, char* filepath) const {
+    // 检查存储路径
+    if (!spath || !strlen(spath)) {
+        logger_error("Storage Path is NULL...");
+        return false;
+    }
+
+    // 生成文件路径中的各个分量
+    unsigned short subdir1 = (fileid / 1000000000) % 1000;    // 一级子目录
+    unsigned short subdir2 = (fileid / 1000000) % 1000;       // 二级子目录
+    unsigned short subdir3 = (fileid / 1000) % 1000;          // 三级子目录
+    time_t         curtime = time(NULL);                      // 当前时间戳
+    unsigned short postfix = (fileid / 1) % 1000;             // 文件名后缀
+
+    // 格式化完成的文件路径
+    if (spath[strlen(spath) - 1] == '/') {
+        snprintf(filepath, PATH_MAX + 1, "%s%03x/%03x/%03x/%0lx_%03x", spath, subdir1, subdir2, subdir3, curtime, postfix);
+    } else {
+        snprintf(filepath, PATH_MAX + 1, "%s/%03x/%03x/%03x/%0lx_%03x", spath, subdir1, subdir2, subdir3, curtime, postfix);
+    }
 
     return OK;
 }
 
 // 接收并保存文件
 int service_c::save(acl::socket_stream* conn, const char* appid, const char* userid, const char* fileid, long long filesize, const char* filepath) const {
+    // 文件操作对象
+    file_c file;
+
+    // 打开文件
+    if (file.open(filepath, file_c::O_WRITE) != OK) {
+        return ERROR;
+    }
+
+    // 依次将接收到的数据块写入文件
+    long long remain = filesize;    // 未接收的字节数
+    char rcvwr[STORAGE_RCVWR_SIZE]; // 接收写入缓冲区
+    while (remain) { // 还有未接收数据
+        // 接收数据
+        long long bytes = std::min(remain, (long long)sizeof(rcvwr));
+        long long count = conn->read(rcvwr, bytes);
+        if (count < 0) {
+            logger_error("Read Fail: %s, Bytes: %lld, FROM: %s", acl::last_serror(), bytes, conn->get_peer());
+            file.close();
+            return SOCKET_ERROR;
+        }
+        
+        // 写入文件
+        if (file.write(rcvwr, count) != OK) {
+            file.close();
+            return ERROR;
+        }
+        
+        // 未收递减
+        remain -= count;
+    }
+
+    // 关闭文件
+
+    // 数据库访问对象
+
+    // 连接数据库
+
+    // 设置文件ID和路径及大小的对应关系
+
+
     return OK;
 }
 
