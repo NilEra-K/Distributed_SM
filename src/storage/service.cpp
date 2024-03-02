@@ -417,13 +417,22 @@ int service_c::save(acl::socket_stream* conn, const char* appid, const char* use
     }
 
     // 关闭文件
+    file.close();
 
     // 数据库访问对象
+    db_c db;
 
     // 连接数据库
+    if (db.connect() != OK) {
+        return ERROR;
+    }
 
     // 设置文件ID和路径及大小的对应关系
-
+    if (db.set(appid, userid, fileid, filepath, filesize) != OK) {
+        error(conn, -1, "INSERT Database Fail, Fileid: %s", fileid);
+        file.del(filepath);
+        return ERROR;
+    }
 
     return OK;
 }
@@ -431,10 +440,63 @@ int service_c::save(acl::socket_stream* conn, const char* appid, const char* use
 // 读取并发送文件
 // -filepath: 发送路径 -offset: 偏移量 -size: 发送大小
 int service_c::send(acl::socket_stream* conn, const char* filepath, long long offset, long long size) const {
+    // 文件操作对象
+    file_c file;
 
+    // 打开文件
+    if (file.open(filepath, file_c::O_READ) != OK) {
+        return ERROR;
+    }
+
+    // 设置偏移
+    if (offset && file.seek(offset) != OK) {
+        file.close();
+        return ERROR;
+    }
+    
+    // | 包体长度 | 命令 | 状态 | 文件内容 |
+    // |    8    |  1  |  1  | 内容大小 |
+    // 构造响应头(文件内容无法一次性发送, 响应头较小, 可以先发送响应头)
+    long long bodylen = size;
+    long long headlen = HEADLEN;
+    char head[headlen] = {};
+    llton(bodylen, head);
+    head[BODYLEN_SIZE] = CMD_STORAGE_REPLY;
+    head[BODYLEN_SIZE + COMMAND_SIZE] = 0;
+
+    // 发送响应头
+    if (conn->write(head, headlen) < 0) {
+        logger_error("Write Fail: %s, Headlen: %lld, TO: %s", acl::last_serror(), headlen, conn->get_peer());
+        file.close();
+        return SOCKET_ERROR;
+    }
+
+    // 依次将从文件中读取到的数据块作为响应体的一部分发送出去
+    long long remain = size;            // 未读取字节数
+    char rdsnd[STORAGE_RDSND_SIZE];     // 读取发送缓冲区
+    while (remain) { // 还有未读取数据
+        // 读取文件
+        long long count = std::min(remain, (long long)sizeof(rdsnd));
+        if (file.read(rdsnd, count) != OK) {
+            file.close();
+            return ERROR;
+        }
+
+        // 发送数据
+        if (conn->write(rdsnd, count) < 0) {
+            logger_error("Write Fail: %s, Count: %lld, TO: %s", acl::last_serror(), count, conn->get_peer());
+            file.close();
+            return SOCKET_ERROR;
+        }
+        
+        // 未读递减
+        remain -= count;
+    }
+    
+    // 关闭文件
+    file.close();
     return OK;
 }
-
 
 // 应答成功
 bool service_c::ok(acl::socket_stream* conn) const {
