@@ -32,5 +32,6 @@ extern std::vector<std::string> g_maddrs;   // 使用 split 拆分后的 MySQL �
 extern std::vector<std::string> g_raddrs;   // 使用 split 拆分后的 Redis 地址列表, 通过 cfg_raddrs 拆分, 方便使用
 extern acl::redis_client_pool* g_rconns;    // Redis连接池
 extern std::string g_hostname;              // 主机名
+extern const char* g_version;               // [新增] 版本
 extern time_t g_stime;                      // [新增] 启动时间
  

@@ -129,7 +129,7 @@ int file_c::seek(off_t offset) const {
 }
 
 // 删除文件
-static int del(const char* path) {
+int file_c::del(const char* path) {
     // 检查路径
     if (!path || !strlen(path)) {
         logger_error("Path is NULL...");
