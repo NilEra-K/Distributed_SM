@@ -13,6 +13,6 @@ int main(void) {
                                                                     // 使用单例模板创建一个具体的实例
     server.set_cfg_str(cfg_str);    // 设置字符型参数配置表 `cfg_str`
     server.set_cfg_int(cfg_int);    // 设置整型参数配置表 `cfg_int`
-    server.run_alone("127.0.0.1:23000", "../../etc/storage.cfg");
+    server.run_alone("127.0.0.1:23000", "../etc/storage.cfg");
     return 0;
 }

@@ -101,6 +101,7 @@ int tracker_c::join(acl::socket_stream* conn) const {
     }
     int command = head[BODYLEN_SIZE];               // 命令
     int status = head[BODYLEN_SIZE + COMMAND_SIZE]; // 状态
+    logger("Bodylen: %lld, Command: %d, Status: %d", bodylen, command, status);
 
     // 检查命令
     if (command != CMD_TRACKER_REPLY) {
@@ -177,6 +178,7 @@ int tracker_c::beat(acl::socket_stream* conn) const {
     }
     int command = head[BODYLEN_SIZE];               // 命令
     int status = head[BODYLEN_SIZE + COMMAND_SIZE]; // 状态
+    logger("Bodylen: %lld, Command: %d, Status: %d", bodylen, command, status);
 
     // 检查命令
     if (command != CMD_TRACKER_REPLY) {
