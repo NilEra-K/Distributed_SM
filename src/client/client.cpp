@@ -123,20 +123,199 @@ int client_c::saddrs(const char* appid, const char* userid, const char* fileid, 
 
 // 从跟踪服务器获取组列表
 int client_c::groups(std::string& groups) {
+    if (s_taddrs.empty()) {
+        logger_error("Tracker Addresses is Empty...");
+        return ERROR;
+    }
+    int result = ERROR;
 
-    return OK;
+    // 生成有限随机数
+    srand(time(NULL));
+    int ntaddrs = s_taddrs.size();
+    int nrand = rand() % ntaddrs;
+
+    for (int i = 0; i < ntaddrs; ++i) {
+        // 随机抽取跟踪服务器地址
+        const char* taddr = s_taddrs[nrand].c_str();
+        nrand = (nrand + 1) % ntaddrs;
+
+        // 获取跟踪服务器连接池
+        pool_c* tpool = (pool_c*)s_mngr->get(taddr);
+        if (!tpool) {
+            logger_warn("Tracker Connection Pool is NULL, taddr: %s", taddr);
+            continue;
+        }
+
+        for (int sockerrs = 0; sockerrs < MAX_SOCKERRS; ++sockerrs) {
+            // 获取跟踪服务器连接
+            conn_c* tconn = (conn_c*)tpool->peek();
+            if (!tconn) {
+                logger_warn("Tracker Connection is NULL, taddr: %s", taddr);
+                break;
+            }
+
+            // 从跟踪服务器获取组列表
+            result = tconn->groups(groups);
+            if (result == SOCKET_ERROR) {
+                logger_warn("Get Groups Fail: %s", tconn->errdesc());
+                tpool->put(tconn, false);
+            } else {
+                if (result == OK) {
+                    tpool->put(tconn, true);
+                } else {
+                    logger_error("Get Groups Fail: %s", tconn->errdesc());
+                    tpool->put(tconn, false);
+                }
+                return result;
+            }
+        }
+    }
+
+    return result;
 }
 
 // 向存储服务器上传文件(文件格式)
 int client_c::upload(const char* appid, const char* userid, const char* fileid, const char* filepath) {
+    // 检查参数
+    if (!appid || !strlen(appid)) {
+        logger_error("Appid is NULL");
+        return ERROR;
+    }
+    if (!userid || !strlen(userid)) {
+        logger_error("Userid is NULL");
+        return ERROR;
+    }
+    if (!fileid || !strlen(fileid)) {
+        logger_error("Fileid is NULL");
+        return ERROR;
+    }
+    if (!filepath || !strlen(filepath)) {
+        logger_error("Filepath is NULL");
+        return ERROR;
+    }
 
-    return OK;
+
+    // 从跟踪服务器获取存储服务器地址列表
+    int result;
+    std::string ssaddrs;
+    if ((result = saddrs(appid, userid, fileid, ssaddrs)) != OK) {
+        return result;
+    }
+    std::vector<std::string> vsaddrs;
+    split(ssaddrs.c_str(), vsaddrs);
+    if (vsaddrs.empty()) {
+        logger_error("Storage Addresses is Empty...");
+        return ERROR;
+    }
+    result = ERROR; // 初始化 result
+    for (std::vector<std::string>::const_iterator saddr = vsaddrs.begin(); saddr != vsaddrs.end(); ++saddr) {
+        // 获取存储服务器连接池
+        pool_c* spool = (pool_c*)s_mngr->get(saddr->c_str());
+        if (!spool) { // 如果 get() 不到, 也并不说明出问题, 有可能是从未建立过该连接, 所以允许 set() 一次
+            s_mngr->set(saddr->c_str(), s_scount);
+            if (!(spool = (pool_c*)s_mngr->get(saddr->c_str()))) {
+                logger_warn("Storage Connection Pool is NULL, Saddr: %s", saddr->c_str());
+                continue;
+            }
+        }
+
+        for (int sockerrs = 0; sockerrs < MAX_SOCKERRS; ++sockerrs) {
+            // 获取存储服务器连接
+            conn_c* sconn = (conn_c*)spool->peek();
+            if (!sconn) {
+                logger_warn("Storage Connection is NULL, saddr: %s", saddr->c_str());
+                break;
+            }
+
+            // 向存储服务器上传文件
+            result = sconn->upload(appid, userid, fileid, filepath);
+            if (result == SOCKET_ERROR) {
+                logger_warn("Upload File Fail: %s", sconn->errdesc());
+                spool->put(sconn, false);
+            } else {
+                if (result == OK) {
+                    spool->put(sconn, true);
+                } else {
+                    logger_error("Upload File Fail: %s", sconn->errdesc());
+                    spool->put(sconn, false);
+                }
+                return result;
+            }
+        }
+    }
+    return result;
 }
 
 // 向存储服务器上传文件(数据格式)
 int client_c::upload(const char* appid, const char* userid, const char* fileid, const char* filedata, long long filesize) {
+    // 检查参数
+    if (!appid || !strlen(appid)) {
+        logger_error("Appid is NULL");
+        return ERROR;
+    }
+    if (!userid || !strlen(userid)) {
+        logger_error("Userid is NULL");
+        return ERROR;
+    }
+    if (!fileid || !strlen(fileid)) {
+        logger_error("Fileid is NULL");
+        return ERROR;
+    }
+    if (!filedata || !filesize) {
+        logger_error("Filedata is NULL");
+        return ERROR;
+    }
 
-    return OK;
+
+    // 从跟踪服务器获取存储服务器地址列表
+    int result;
+    std::string ssaddrs;
+    if ((result = saddrs(appid, userid, fileid, ssaddrs)) != OK) {
+        return result;
+    }
+    std::vector<std::string> vsaddrs;
+    split(ssaddrs.c_str(), vsaddrs);
+    if (vsaddrs.empty()) {
+        logger_error("Storage Addresses is Empty...");
+        return ERROR;
+    }
+    result = ERROR; // 初始化 result
+    for (std::vector<std::string>::const_iterator saddr = vsaddrs.begin(); saddr != vsaddrs.end(); ++saddr) {
+        // 获取存储服务器连接池
+        pool_c* spool = (pool_c*)s_mngr->get(saddr->c_str());
+        if (!spool) { // 如果 get() 不到, 也并不说明出问题, 有可能是从未建立过该连接, 所以允许 set() 一次
+            s_mngr->set(saddr->c_str(), s_scount);
+            if (!(spool = (pool_c*)s_mngr->get(saddr->c_str()))) {
+                logger_warn("Storage Connection Pool is NULL, Saddr: %s", saddr->c_str());
+                continue;
+            }
+        }
+
+        for (int sockerrs = 0; sockerrs < MAX_SOCKERRS; ++sockerrs) {
+            // 获取存储服务器连接
+            conn_c* sconn = (conn_c*)spool->peek();
+            if (!sconn) {
+                logger_warn("Storage Connection is NULL, saddr: %s", saddr->c_str());
+                break;
+            }
+
+            // 向存储服务器上传文件
+            result = sconn->upload(appid, userid, fileid, filedata, filesize);
+            if (result == SOCKET_ERROR) {
+                logger_warn("Upload File Fail: %s", sconn->errdesc());
+                spool->put(sconn, false);
+            } else {
+                if (result == OK) {
+                    spool->put(sconn, true);
+                } else {
+                    logger_error("Upload File Fail: %s", sconn->errdesc());
+                    spool->put(sconn, false);
+                }
+                return result;
+            }
+        }
+    }
+    return result;
 }
 
 // 向存储服务器询问文件大小
