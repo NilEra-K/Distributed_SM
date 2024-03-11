@@ -19,7 +19,7 @@ extern int cfg_interval;                // 存储服务器状态检查间隔秒�
 extern int cfg_mtimeout;                // MySQL 读写超时, 超过这个时间未完成读写, 就放弃读写, 防止死等
 extern int cfg_maxconns;                // Redis 连接池最大连接数
 extern int cfg_ctimeout;                // Redis 连接超时
-extern int cfg_rtimmout;                // Redis 读写超时
+extern int cfg_rtimeout;                // Redis 读写超时
 extern int cfg_ktimeout;                // Redis 键超时
 extern acl::master_int_tbl cfg_int[];   // 整型配置表, master_int_tbl 本质是一个结构体
 

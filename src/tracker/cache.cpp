@@ -39,6 +39,7 @@ int cache_c::get(const char* key, acl::string& value) const {
     // 检查空值
     if (value.empty()) {
         logger_warn("Value is Empty, Key: %s", tracker_key.c_str());
+        g_rconns->put(rconn, false);        // [2024.03.11] Debug
         return ERROR;
     }
 
@@ -84,7 +85,7 @@ int cache_c::set(const char* key, const char* value, int timeout) const {
     return OK;
 }
 
-//
+// 删除指定键值对
 int cache_c::del(const char* key) const {
     // 构造键
     acl::string tracker_key;

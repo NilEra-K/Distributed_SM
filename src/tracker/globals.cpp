@@ -18,7 +18,7 @@ int cfg_interval;                // 存储服务器状态检查间隔秒数
 int cfg_mtimeout;                // MySQL 读写超时, 超过这个时间未完成读写, 就放弃读写, 防止死等
 int cfg_maxconns;                // Redis 连接池最大连接数
 int cfg_ctimeout;                // Redis 连接超时
-int cfg_rtimmout;                // Redis 读写超时
+int cfg_rtimeout;                // Redis 读写超时
 int cfg_ktimeout;                // Redis 键超时
 acl::master_int_tbl cfg_int[]{   // 整型配置表, master_int_tbl 实际为结构体, 传入值以及为何传入需要查看 master_int_tbl 具体实现
                                  // 传入的 {X, X, X, 0, 0}, 0 是表示没有使用该结构体里的变量
