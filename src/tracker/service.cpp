@@ -168,7 +168,7 @@ bool service_c::saddrs(acl::socket_stream* conn, long long bodylen) const {
     char fileid[FILEID_SIZE];   // 文件ID
     strcpy(appid, body);
     strcpy(userid, body + APPID_SIZE);
-    strcpy(fileid, body + APPID_SIZE + FILEID_SIZE);
+    strcpy(fileid, body + APPID_SIZE + USERID_SIZE);
 
     // 响应客户机存储服务器地址列表
     if (saddrs(conn, appid, userid) != OK) {
@@ -220,22 +220,22 @@ bool service_c::groups(acl::socket_stream* conn) const {
                        std::string(ctime(&si->si_jtime)).c_str(),
                        std::string(ctime(&si->si_btime)).c_str());
             switch (si->si_status) {
-            case STORAGE_STATUS_OFFLINE:
-                stg += "OFFLINE";
-                break;
-            
-            case STORAGE_STATUS_ONLINE:
-                stg += "ONLINE";
-                break;
+                case STORAGE_STATUS_OFFLINE:
+                    stg += "OFFLINE";
+                    break;
+                
+                case STORAGE_STATUS_ONLINE:
+                    stg += "ONLINE";
+                    break;
 
-            case STORAGE_STATUS_ACTIVE:
-                stg += "ACTIVE";
-                ++act;  // 每发现一个活动服务器就将 act 计数器 +1
-                break;
+                case STORAGE_STATUS_ACTIVE:
+                    stg += "ACTIVE";
+                    ++act;  // 每发现一个活动服务器就将 act 计数器 +1
+                    break;
 
-            default:
-                stg += "UNKNOWN";
-                break;
+                default:
+                    stg += "UNKNOWN";
+                    break;
             }
             grp += stg + "\n";  // 存储服务器字符串
         }
@@ -258,12 +258,14 @@ bool service_c::groups(acl::socket_stream* conn) const {
     resp[BODYLEN_SIZE] = CMD_TRACKER_REPLY;
     resp[BODYLEN_SIZE + COMMAND_SIZE] = 0;
     strcpy(resp + HEADLEN, gps.c_str());
+    logger("%s", gps.c_str());
 
     // 发送响应
     if (conn->write(resp, resplen) < 0) {
         logger_error("Write Fail: %s, Respone Length: %lld, To: %s", acl::last_serror(), resplen, conn->get_peer());
         return false;
     }
+    logger("[Tracker] Connection OK, Message Has Been Sent...");
 
     return true;
 }
@@ -360,7 +362,7 @@ int service_c::beat(const char* groupname, const char* hostname, const char* sad
             if (!strcmp(si->si_hostname, hostname) && !strcmp(si->si_addr, saddr)) {
                 // 更新该列表中的相应记录
                 si->si_btime  = time(NULL);             // 更新心跳时间
-                si->si_status = STORAGE_STATUS_ONLINE;  // 状态
+                si->si_status = STORAGE_STATUS_ACTIVE;  // 状态
                 break;
             }
         }
@@ -402,7 +404,7 @@ int service_c::saddrs(acl::socket_stream* conn, const char* appid, const char* u
     if(group_of_user(appid, userid, groupname) != OK) { // 为什么需要传入 `appid`
                                                         // 防止无法查询到 `userid`, 返回一个空组名, 此时需要插入一条相关记录完成随机组的分配
                                                         // 而这个操作需要使用 `appid`
-        error(conn, -1, "Grt Groupname Fail...");
+        error(conn, -1, "[Tracker] Get Groupname Fail...");
         return ERROR;
     }
 
@@ -520,7 +522,7 @@ int service_c::saddrs_of_group(const char* groupname, std::string& saddrs) const
         }
     } else { // 若没找到该组
         // 错误处理
-        logger_error("No Found Group: %s", groupname);
+        logger_error("Not Found Group: %s", groupname);
         result = ERROR;
     }
 
@@ -599,5 +601,5 @@ bool service_c::error(acl::socket_stream* conn, short errnumb, const char* forma
         return false;
     }
 
-    return OK;
+    return true;    // [2024.03.12] Debug
 }

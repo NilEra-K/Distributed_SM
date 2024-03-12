@@ -34,14 +34,14 @@ void server_c::proc_on_init(void) {
         logger_error("Redis Addresses Is NULL...");
     } else {
         split(cfg_raddrs, g_raddrs);
-        if (g_maddrs.empty()) {
+        if (g_raddrs.empty()) {
             logger_error("Redis Addresses IS EMPTY...");
         } else {
             // 遍历 Redis 地址表, 尝试创建链接池
             for (std::vector<std::string>::const_iterator raddr = g_raddrs.begin(); raddr != g_raddrs.end(); ++raddr) {
                 if ((g_rconns = new acl::redis_client_pool(raddr->c_str(), cfg_maxconns))) {
                     // 设置 Redis 连接超时和读写超时
-                    g_rconns->set_timeout(cfg_ctimeout, cfg_rtimmout);
+                    g_rconns->set_timeout(cfg_ctimeout, cfg_rtimeout);
                     break;
                 }
             }
@@ -52,10 +52,11 @@ void server_c::proc_on_init(void) {
     }
 
     // 主机名
-    char hostname[256 + 1];
+    char hostname[256 + 1] = {};
     if (gethostname(hostname, sizeof(hostname) - 1)) {
         logger_error("Call `gethostname` Fail: %s", strerror(errno));
     }
+    g_hostname = hostname;
 
     // 创建并开启存储服务器状态检查线程
     if ((m_status = new status_c)) {
@@ -65,7 +66,7 @@ void server_c::proc_on_init(void) {
     
     // 打印配置信息
     logger("cfg_appids: %s, "
-           "cfg_maddrss: %s, "
+           "cfg_maddrs: %s, "
            "cfg_raddrs: %s, "
            "cfg_interval: %d, "
            "cfg_mtimeout: %d, "
@@ -80,7 +81,7 @@ void server_c::proc_on_init(void) {
            cfg_mtimeout, 
            cfg_maxconns, 
            cfg_ctimeout, 
-           cfg_rtimmout,
+           cfg_rtimeout,
            cfg_ktimeout);
 }
 
@@ -134,6 +135,7 @@ bool server_c::thread_on_accept(acl::socket_stream* conn) {
 // 与线程绑定的连接可读时被调用
 bool server_c::thread_on_read(acl::socket_stream* conn) {
     // 接收包头
+    logger("[Tracker] Start Recive Package Head...");
     char head[HEADLEN];
     if (conn->read(head, HEADLEN) < 0) {
         if (conn->eof()) {

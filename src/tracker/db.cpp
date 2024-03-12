@@ -73,7 +73,7 @@ int db_c::get(const char* userid, std::string& groupname) const {
 int db_c::set(const char* appid, const char* userid, const char* groupname) const {
     // 插入
     acl::string sql;
-    sql.format("INSERT INTO t_router SET appid='%s', userid='%s', groupname='%s'", appid, userid, groupname);
+    sql.format("INSERT INTO t_router SET appid='%s', userid='%s', group_name='%s'", appid, userid, groupname);
     if (mysql_query(m_mysql, sql.c_str())) {
         logger_error("Insert Database Fail: %s, SQL: %s", mysql_error(m_mysql), sql.c_str());
         return ERROR;
@@ -94,7 +94,7 @@ int db_c::set(const char* appid, const char* userid, const char* groupname) cons
 int db_c::get(std::vector<std::string>& groupnames) const {
     // 查询全部组名
     acl::string sql;
-    sql.format("SELECT group_name FROM t_group_info;");
+    sql.format("SELECT group_name FROM t_groups_info;");
     if (mysql_query(m_mysql, sql.c_str())) {
         logger_error("Query Database Fail: %s, SQL: %s", mysql_error(m_mysql), sql.c_str());
         return ERROR;
