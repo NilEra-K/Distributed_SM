@@ -1,6 +1,5 @@
 // 公共模块
 // 实现实用函数
-#pragma once
 
 #include <string.h>
 #include "types.h"
@@ -80,7 +79,7 @@ void ston(short s, char* n) {
 short ntos(const char* n) {
     short s = 0;
     for (size_t i = 0; i < sizeof(s); ++i) {
-        s |= (long long)(unsigned char)n[i] << (sizeof(s) - i - 1) * 8;
+        s |= (short)(unsigned char)n[i] << (sizeof(s) - i - 1) * 8;
     }
     return s;
 }
