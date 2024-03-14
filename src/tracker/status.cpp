@@ -56,7 +56,7 @@ int status_c::check(void) const {
 
     // 互斥锁解锁
     if ((errno = pthread_mutex_unlock(&g_mutex))) {
-        logger_error("Call `pthread_mutex_lock` Fail: %s", strerror(errno));
+        logger_error("Call `pthread_mutex_unlock` Fail: %s", strerror(errno));
         return ERROR;
     }
     return OK;

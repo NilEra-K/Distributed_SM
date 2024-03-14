@@ -26,24 +26,24 @@ bool service_c::business(acl::socket_stream* conn, const char* head) const {
     // 根据命令执行具体的业务处理
     bool result;
     switch (command) {
-    case CMD_TRACKER_JOIN:      // 处理来自存储服务器的加入包
-        result = join(conn, bodylen);
-        break;
+        case CMD_TRACKER_JOIN:      // 处理来自存储服务器的加入包
+            result = join(conn, bodylen);
+            break;
 
-    case CMD_TRACKER_BEAT:      // 处理来自存储服务器的心跳包
-        result = beat(conn, bodylen);
-        break;
+        case CMD_TRACKER_BEAT:      // 处理来自存储服务器的心跳包
+            result = beat(conn, bodylen);
+            break;
 
-    case CMD_TRACKER_SADDRS:    // 处理来自客户机的获取存储服务器地址列表请求
-        result = saddrs(conn, bodylen);
-        break;
+        case CMD_TRACKER_SADDRS:    // 处理来自客户机的获取存储服务器地址列表请求
+            result = saddrs(conn, bodylen);
+            break;
 
-    case CMD_TRACKER_GROUPS:    // 处理来自客户机的获取组列表的请求
-        result = groups(conn);
-        break;
-    default:
-        error(conn, -1, "Unknown Command: %d", command);
-        return false;
+        case CMD_TRACKER_GROUPS:    // 处理来自客户机的获取组列表的请求
+            result = groups(conn);
+            break;
+        default:
+            error(conn, -1, "Unknown Command: %d", command);
+            return false;
     }
     return result;
 }
@@ -258,7 +258,7 @@ bool service_c::groups(acl::socket_stream* conn) const {
     resp[BODYLEN_SIZE] = CMD_TRACKER_REPLY;
     resp[BODYLEN_SIZE + COMMAND_SIZE] = 0;
     strcpy(resp + HEADLEN, gps.c_str());
-    logger("%s", gps.c_str());
+    // logger("%s", gps.c_str()); // [2024.03.13] Debug - Cancel
 
     // 发送响应
     if (conn->write(resp, resplen) < 0) {

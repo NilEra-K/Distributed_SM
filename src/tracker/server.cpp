@@ -142,8 +142,8 @@ bool server_c::thread_on_read(acl::socket_stream* conn) {
             logger("Connection Has Been Closed, From %s", conn->get_peer());
         } else {
             logger_error("Read Fail: %s, From %s", acl::last_serror(), conn->get_peer());
-            return false;
         }
+        return false;
     }
 
     // 业务处理

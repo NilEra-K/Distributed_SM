@@ -80,7 +80,7 @@ int cache_c::set(const char* key, const char* value, int timeout) const {
     }
     
     // 如果成功, 打印日志
-    logger("Set Cache OK, Key: %s, Value: %s", tracker_key.c_str(), value);
+    logger("Set Cache OK, Key: %s, Value: %s, Timeout: %d", tracker_key.c_str(), value, timeout);
     g_rconns->put(rconn, true);         // 将连接放回连接池, 但是不关闭连接, 即将 rconn 标记为闲
     return OK;
 }
