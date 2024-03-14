@@ -74,7 +74,7 @@ long id_c::client(const char* requ, long long requlen) const {
     long long resplen = HEADLEN + BODYLEN_SIZE;
     char resp[resplen] = {};
     if (conn.read(resp, resplen) < 0) {
-        logger_error("Read Fail: %s, Requlen: %lld, FROM: %s", acl::last_serror(), requlen, conn.get_peer());
+        logger_error("Read Fail: %s, Resplen: %lld, FROM: %s", acl::last_serror(), requlen, conn.get_peer());
         conn.close();
         return -1;
     }

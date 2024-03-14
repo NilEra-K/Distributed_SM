@@ -20,10 +20,11 @@ void server_c::proc_on_init(void) {
     }
 
     // 主机名
-    char hostname[256 + 1];
+    char hostname[256 + 1] = { };
     if (gethostname(hostname, sizeof(hostname) - 1)) {
         logger_error("Call `gethostname` Fail: %s", strerror(errno));
     }
+    g_hostname = hostname;
 
     // 最大偏移不能太小
     if (cfg_maxoffset < 10) {
@@ -31,7 +32,7 @@ void server_c::proc_on_init(void) {
     }
    
     // 打印配置信息
-    logger("cfg_maddrss: %s, "
+    logger("cfg_maddrs: %s, "
            "cfg_mtimeout: %d, "
            "cfg_maxoffset: %d",
            cfg_maddrs, 
@@ -73,8 +74,8 @@ bool server_c::thread_on_read(acl::socket_stream* conn) {
             logger("Connection Has Been Closed, From %s", conn->get_peer());
         } else {
             logger_error("Read Fail: %s, From %s", acl::last_serror(), conn->get_peer());
-            return false;
         }
+        return false;
     }
 
     // 业务处理

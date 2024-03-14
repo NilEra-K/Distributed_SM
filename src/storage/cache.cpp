@@ -39,6 +39,7 @@ int cache_c::get(const char* key, acl::string& value) const {
     // 检查空值
     if (value.empty()) {
         logger_warn("Value is Empty, Key: %s", storage_key.c_str());
+        g_rconns->put(rconn, false);    // [2024.03.13] Debug
         return ERROR;
     }
 
@@ -79,7 +80,7 @@ int cache_c::set(const char* key, const char* value, int timeout) const {
     }
     
     // 如果成功, 打印日志
-    logger("Set Cache OK, Key: %s, Value: %s", storage_key.c_str(), value);
+    logger("Set Cache OK, Key: %s, Value: %s, Timeout: %d", storage_key.c_str(), value, timeout);
     g_rconns->put(rconn, true);         // 将连接放回连接池, 但是不关闭连接, 即将 rconn 标记为闲
     return OK;
 }

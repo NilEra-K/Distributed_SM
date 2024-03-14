@@ -24,13 +24,13 @@ bool service_c::business(acl::socket_stream* conn, const char* head) const {
     // 根据命令执行具体的业务处理
     bool result;
     switch (command) {
-    case CMD_ID_GET:            // 处理来自存储服务器的获取ID请求
-        result = get(conn, bodylen);
-        break;
+        case CMD_ID_GET:    // 处理来自存储服务器的获取ID请求
+            result = get(conn, bodylen);
+            break;
 
-    default:
-        error(conn, -1, "Unknown Command: %d", command);
-        return false;
+        default:
+            error(conn, -1, "Unknown Command: %d", command);
+            return false;
     }
     return result;
 }
@@ -197,5 +197,5 @@ bool service_c::error(acl::socket_stream* conn, short errnumb, const char* forma
         return false;
     }
 
-    return OK;
+    return true;
 }

@@ -28,24 +28,24 @@ bool service_c::business(acl::socket_stream* conn, const char* head) const {
     // 根据命令执行具体的业务处理
     bool result;
     switch (command) {
-    case CMD_STORAGE_UPLOAD:    // 处理来自客户机的上传文件请求
-        result = upload(conn, bodylen);
-        break;
+        case CMD_STORAGE_UPLOAD:    // 处理来自客户机的上传文件请求
+            result = upload(conn, bodylen);
+            break;
 
-    case CMD_STORAGE_FILESIZE:  // 处理来自客户机的询问文件大小请求
-        result = filesize(conn, bodylen);
-        break;
+        case CMD_STORAGE_FILESIZE:  // 处理来自客户机的询问文件大小请求
+            result = filesize(conn, bodylen);
+            break;
 
-    case CMD_STORAGE_DOWNLOAD:  // 处理来自客户机的下载文件请求
-        result = download(conn, bodylen);
-        break;
+        case CMD_STORAGE_DOWNLOAD:  // 处理来自客户机的下载文件请求
+            result = download(conn, bodylen);
+            break;
 
-    case CMD_STORAGE_DELETE:    // 处理来自客户机的删除文件请求
-        result = del(conn, bodylen);
-        break;
-    default:
-        error(conn, -1, "Unknown Command: %d", command);
-        return false;
+        case CMD_STORAGE_DELETE:    // 处理来自客户机的删除文件请求
+            result = del(conn, bodylen);
+            break;
+        default:
+            error(conn, -1, "Unknown Command: %d", command);
+            return false;
     }
     return result;
 }
@@ -92,6 +92,7 @@ bool service_c::upload(acl::socket_stream* conn, long long bodylen) const {
         error(conn, -1, "Get Filepath Fail...");
         return false;
     }
+    logger("Upload File, Appid: %s, Userid: %s, Fileid: %s, Filesize: %lld\n Filepath: %s", appid, userid, fileid, filesize, filepath);
 
     // 接收并保存文件
     int result = save(conn, appid, userid, fileid, filesize, filepath);
@@ -101,7 +102,7 @@ bool service_c::upload(acl::socket_stream* conn, long long bodylen) const {
         error(conn, -1, "Receive and Save File Fail, Fileid: %s", fileid);
         return false;
     }
-    return true;
+    return ok(conn);
 }
 
 // 处理来自客户机的询问文件大小请求
@@ -111,7 +112,7 @@ bool service_c::filesize(acl::socket_stream* conn, long long bodylen) const {
     // 检查包体长度
     long long expected = APPID_SIZE + USERID_SIZE + FILEID_SIZE;
     if (bodylen != expected) {
-        error(conn, -1, "Invalid Body Length: %lld < %lld", bodylen, expected);
+        error(conn, -1, "Invalid Body Length: %lld != %lld", bodylen, expected);
         return false;
     }
 
@@ -178,7 +179,7 @@ bool service_c::download(acl::socket_stream* conn, long long bodylen) const {
     // 检查包体长度
     long long expected = APPID_SIZE + USERID_SIZE + FILEID_SIZE + BODYLEN_SIZE + BODYLEN_SIZE;
     if (bodylen != expected) {
-        error(conn, -1, "Invalid Body Length: %lld < %lld", bodylen, expected);
+        error(conn, -1, "Invalid Body Length: %lld != %lld", bodylen, expected);
         return false;
     }
 
@@ -258,7 +259,7 @@ bool service_c::del(acl::socket_stream* conn, long long bodylen) const {
     // 检查包体长度
     long long expected = APPID_SIZE + USERID_SIZE + FILEID_SIZE;
     if (bodylen != expected) {
-        error(conn, -1, "Invalid Body Length: %lld < %lld", bodylen, expected);
+        error(conn, -1, "Invalid Body Length: %lld != %lld", bodylen, expected);
         return false;
     }
 
@@ -363,7 +364,7 @@ int service_c::id2path(const char* spath, long fileid, char* filepath) const {
     // 检查存储路径
     if (!spath || !strlen(spath)) {
         logger_error("Storage Path is NULL...");
-        return false;
+        return ERROR;
     }
 
     // 生成文件路径中的各个分量
@@ -375,9 +376,9 @@ int service_c::id2path(const char* spath, long fileid, char* filepath) const {
 
     // 格式化完成的文件路径
     if (spath[strlen(spath) - 1] == '/') {
-        snprintf(filepath, PATH_MAX + 1, "%s%03x/%03x/%03x/%0lx_%03x", spath, subdir1, subdir2, subdir3, curtime, postfix);
+        snprintf(filepath, PATH_MAX + 1, "%s%03X/%03X/%03X/%lX_%03X", spath, subdir1, subdir2, subdir3, curtime, postfix);
     } else {
-        snprintf(filepath, PATH_MAX + 1, "%s/%03x/%03x/%03x/%0lx_%03x", spath, subdir1, subdir2, subdir3, curtime, postfix);
+        snprintf(filepath, PATH_MAX + 1, "%s/%03X/%03X/%03X/%lX_%03X", spath, subdir1, subdir2, subdir3, curtime, postfix);
     }
 
     return OK;
@@ -507,7 +508,7 @@ bool service_c::ok(acl::socket_stream* conn) const {
     long long resplen = HEADLEN + bodylen;
     char resp[resplen] = {};
     llton(bodylen, resp);
-    resp[BODYLEN_SIZE] = CMD_TRACKER_REPLY;
+    resp[BODYLEN_SIZE] = CMD_STORAGE_REPLY;
     resp[BODYLEN_SIZE + COMMAND_SIZE] = 0;
 
     // 发送响应
@@ -550,7 +551,7 @@ bool service_c::error(acl::socket_stream* conn, short errnumb, const char* forma
     long long resplen = HEADLEN + bodylen;
     char resp[resplen] = {};                                // |--------|-|-|--|-----|
     llton(bodylen, resp);                                   // |########|-|-|--|-----|
-    resp[BODYLEN_SIZE] = CMD_TRACKER_REPLY;                 // |########|#|-|--|-----|
+    resp[BODYLEN_SIZE] = CMD_STORAGE_REPLY;                 // |########|#|-|--|-----|
     resp[BODYLEN_SIZE + COMMAND_SIZE] = STATUS_ERROR;       // |########|#|#|--|-----|
     ston(errnumb, resp + HEADLEN);                          // |########|#|#|##|-----|
     if (desclen) {                                          // |########|#|#|##|#####|  当 `desclen` 不为 `0` 时执行 `if` 代码
@@ -564,5 +565,5 @@ bool service_c::error(acl::socket_stream* conn, short errnumb, const char* forma
         return false;
     }
 
-    return OK;
+    return true;
 }

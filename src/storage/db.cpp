@@ -60,7 +60,7 @@ int db_c::get(const char* appid, const char* userid, const char* fileid, std::st
     }
     
     acl::string sql;
-    sql.format("SELECT * file_path, file_size FROM %s WHERE id='%s';", tablename.c_str(), fileid);
+    sql.format("SELECT file_path, file_size FROM %s WHERE id='%s';", tablename.c_str(), fileid);
     if (mysql_query(m_mysql, sql.c_str())) {
         logger_error("Query Database Fail: %s, SQL: %s", mysql_error(m_mysql), sql.c_str());
         return ERROR;
@@ -95,13 +95,13 @@ int db_c::set(const char* appid, const char* userid, const char* fileid, const c
     // 根据用户ID获取其对应的表名
     std::string tablename = table_of_user(userid);
     if (tablename.empty()) {
-        logger_error("Tabel Name is Empty, Appid: %s, Userid: %s, Fileid: %s", appid, userid, fileid);
+        logger_error("Table Name is Empty, Appid: %s, Userid: %s, Fileid: %s", appid, userid, fileid);
         return ERROR;
     }
 
     // 插入一条记录
     acl::string sql;
-    sql.format("INSERT INTO %s SET id='%s', appid='%s', userid='%s', status=0, file_path=%s, file_size=%lld;", tablename.c_str(), fileid, appid, userid, filepath, filesize);
+    sql.format("INSERT INTO %s SET id='%s', appid='%s', userid='%s', status=0, file_path='%s', file_size=%lld;", tablename.c_str(), fileid, appid, userid, filepath, filesize);
     if (mysql_query(m_mysql, sql.c_str())) {
         logger_error("INSERT Database Fail: %s, SQL: %s", mysql_error(m_mysql), sql.c_str());
         return ERROR;
@@ -130,7 +130,7 @@ int db_c::del(const char* appid, const char* userid, const char* fileid) const {
     // 再从数据库中删除文件ID
     std::string tablename = table_of_user(userid);
     if (tablename.empty()) {
-        logger_error("Tabel Name is Empty, Appid: %s, Userid: %s, Fileid: %s", appid, userid, fileid);
+        logger_error("Table Name is Empty, Appid: %s, Userid: %s, Fileid: %s", appid, userid, fileid);
         return ERROR;
     }
 
@@ -153,7 +153,7 @@ int db_c::del(const char* appid, const char* userid, const char* fileid) const {
 // 根据用户ID获取其对应的表名
 std::string db_c::table_of_user(const char* userid) const {
     char tablename[10];     // Table Name: t_file_xx\0
-    sprintf(tablename, "t_file_%02d", (hash(userid, strlen(userid) & 0x7FFFFFFF)) % 3 + 1);
+    sprintf(tablename, "t_file_%02d", (hash(userid, strlen(userid)) & 0x7FFFFFFF) % 3 + 1);
     return tablename;
 }
 
