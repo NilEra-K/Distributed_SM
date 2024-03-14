@@ -14,6 +14,7 @@ conn_c::conn_c(const char* destaddr, int ctimeout /* = 30 */, int rtimeout /* = 
     acl_assert(destaddr && *destaddr);
     // 复制目的地址
     m_destaddr = acl_mystrdup(destaddr);
+    logger("[Client] m_destaddr: %s", m_destaddr);
 }
 
 // 从跟踪服务器获取存储服务器地址列表
@@ -78,7 +79,7 @@ int conn_c::groups(std::string& groups) {
     // |    8    |  1  |  1  |
     long long bodylen = 0;
     long long requlen = HEADLEN + bodylen;
-    char requ[requlen];
+    char requ[requlen] = {};
     llton(bodylen, requ);
     requ[BODYLEN_SIZE] = CMD_TRACKER_GROUPS;
     requ[BODYLEN_SIZE + COMMAND_SIZE] = 0;
@@ -101,6 +102,7 @@ int conn_c::groups(std::string& groups) {
 
     // 接收包体
     int result = recvbody(&body, &bodylen);
+    // logger("[Client groups(...)] %s", body);
 
     // 解析包体
     if (result == OK) {
@@ -108,6 +110,7 @@ int conn_c::groups(std::string& groups) {
         // | 包体长度 | 命令 | 状态 |  组列表 |
         // |    8    |  1  |  1  | 包体长度 |
         groups = body;
+        // logger("[Client] %s", body);
     } else if (result == STATUS_ERROR) {
         // 失败
         // | 包体长度 | 命令 | 状态 | 错误号 | 错误描述 |
@@ -121,6 +124,7 @@ int conn_c::groups(std::string& groups) {
         free(body);
         body = NULL;
     }
+    logger("[Client] Result: %d\n", result);
 
     return result;
 }
@@ -202,6 +206,7 @@ int conn_c::upload(const char* appid, const char* userid, const char* fileid, co
         free(body);
         body = NULL;
     }
+    logger("[Client] Result: %d", result);
 
     return result;
 }
@@ -236,9 +241,9 @@ int conn_c::upload(const char* appid, const char* userid, const char* fileid, co
 
     // 发送文件
     if (m_conn->write(filedata, filesize) < 0) {
-        logger_error("Write Fail: %s, Filesize: %lld, TO: %s", acl::last_serror(), requlen, m_conn->get_peer());
+        logger_error("Write Fail: %s, Filesize: %lld, TO: %s", acl::last_serror(), filesize, m_conn->get_peer());
         m_errnumb = -1;
-        m_errdesc.format("Write Fail: %s, Filesize: %lld, TO: %s", acl::last_serror(), requlen, m_conn->get_peer());
+        m_errdesc.format("Write Fail: %s, Filesize: %lld, TO: %s", acl::last_serror(), filesize, m_conn->get_peer());
         close();
         return SOCKET_ERROR;
     }
@@ -333,7 +338,7 @@ int conn_c::download(const char* appid, const char* userid, const char* fileid, 
         return ERROR;
     }
     llton(bodylen, requ);
-    llton(offset, requ + HEADLEN + USERID_SIZE + FILEID_SIZE);
+    llton(offset, requ + HEADLEN + APPID_SIZE + USERID_SIZE + FILEID_SIZE);
     llton(size, requ + HEADLEN + APPID_SIZE + USERID_SIZE + FILEID_SIZE + BODYLEN_SIZE);
 
     if (!open()) {
@@ -453,6 +458,7 @@ conn_c::~conn_c(void) {
 
 // 打开连接
 bool conn_c::open(void) {
+    logger("[Client] Start Open Socket...\n");
     if (m_conn) { // 防止出现多次调用 open() 函数导致内存泄漏
         return true;
     }
@@ -542,6 +548,8 @@ int conn_c::recvbody(char** body, long long* bodylen) {
             close();
             return SOCKET_ERROR;
         }
+        logger("[Client] `m_conn->read()` OK");
+        logger("%s", *body);
     }
 
     return result;
